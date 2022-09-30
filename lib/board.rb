@@ -143,6 +143,7 @@ class King < Board
     @moves = []
     @moved = false
     @team == "White" ? @position = [7,4] : @position = [0,4]
+    move_finder
   end
 
   def board()
@@ -150,7 +151,7 @@ class King < Board
   end
 
   def piece_movement()
-    return [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,1], [-1,-1], [0,1], [0,-1]]
+    return [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,-1], [0,1], [0,-1]]
   end
 
   def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
@@ -267,13 +268,65 @@ class Knight < Board
       @team = team
       @symbol = symbol
       @status = "active"
-      # @moves = []
       @moved = false
       @value = 3
       @position = position
+      move_finder
   end
 
-  def move_finder()
+  def board()
+    @@board
+  end
+
+  def piece_movement()
+    return [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [-1,2], [1,-2], [-1,-2]]
+  end
+
+  def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
+    for move in moves
+      if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
+        options << [position[0]+move[0], position[1]+move[1]]
+      end
+    end
+    options
+  end
+
+  def opponent?(square, team=@team)
+    opposingPiece = board[square[0]][square[1]]
+    if opposingPiece != "X" && opposingPiece.team != team
+      return true
+    end
+  end
+
+  def attack_move_finder(position=@position)
+    targets = []
+    board
+    moves = piece_movement()
+    attackableSquares = possible_landing_squares(moves)
+    for square in attackableSquares
+      if opponent?(square)
+        targets << square
+      end
+    end
+    targets
+  end
+
+  def move_finder(position=@position)
+    @moves = []
+    board
+    moves = piece_movement()
+    possibleDestinations = possible_landing_squares(moves)
+    for destination in possibleDestinations
+      obstructed = false
+      if board[destination[0]][destination[1]] != "X"
+          obstructed = true
+      end
+      if obstructed == false
+        @moves << destination
+      end
+    end
+    targets = attack_move_finder()
+    @moves = @moves + targets
   end
 end
 
@@ -375,4 +428,5 @@ end
 chess = Board.new()
 chess.move_piece(chess.whitePawn5, [4,4])
 chess.move_piece(chess.whiteKing, [6,4])
+chess.move_piece(chess.blackKnight1, [2,0])
 chess.show_board
