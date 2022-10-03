@@ -1,13 +1,94 @@
 require 'pry-byebug'
 
-class Board
+class Game
+
+  attr_reader :teams, :players
+
+  def initialize()
+    @teams = ["White", "Black"]
+    @players = []
+    @moveCounter = 0
+    @winner = false
+    puts "Welcome to Chess!"
+    choose_game_mode
+    @gameMode == 1 ? pass_to_play_mode(@teams) : return
+  end
+
+  def choose_game_mode()
+    puts "Would you like to play against a friend or a computer? Type 1 for friend and 0 for computer: "
+    @gameMode = gets.chomp.to_i
+  end
+
+  def pass_to_play_mode(teams)
+    puts "Great choice! Please enter a name for player 1: "
+    playerOneName = gets.chomp
+    puts "Welcome #{playerOneName}! Please enter a name for player 2: "
+    playerTwoName = gets.chomp
+    playerOneTeam = @teams.sample
+    playerOneTeam == "White" ? playerTwoTeam = "Black" : playerTwoTeam = "White"
+    puts "Great, thanks #{playerTwoName}. #{playerOneName} will be #{playerOneTeam} & #{playerTwoName} will be #{playerTwoTeam}"
+    @players << player1 = {:name => playerOneName, :team => playerOneTeam}
+    @players << player2 = {:name => playerTwoName, :team => playerTwoTeam}
+  end
+
+  def turn_picker(players)
+    if players[0][:team] == "White"
+      @moveCounter % 2 == 0 ? players[0] : players[1]
+    else
+      @moveCounter % 2 == 0 ? players[1] : players[0]
+    end
+  end
+
+  def piece_selector()
+    puts "#{@turn[:name]} pick a piece to move: "
+    input = gets.chomp
+    @piece = [input[1].to_i,input[3].to_i]
+    while @play.board[@piece[0]][@piece[1]].team != @turn[:team]
+      puts "Please choose a valid piece"
+      input = gets.chomp
+      @piece = [input[1].to_i,input[3].to_i]
+    end
+    @piece
+  end
+
+  def move_selector()
+    pieceMoves = @play.get_piece_moves(@piece)
+    puts "#{@turn[:name]} pick a square to move to: "
+    input = gets.chomp
+    move = [input[1].to_i,input[3].to_i]
+    while !pieceMoves.include?(move)
+      puts "Please choose a valid move combination"
+      input = gets.chomp
+      move = [input[1].to_i,input[3].to_i]
+      pieceMoves = @play.get_piece_moves(@piece)
+    end
+    move
+  end
+
+  def play_game()
+    @play = Board.new()
+    board = @play.board
+    @play.show_board
+    while @winner == false
+      @turn = turn_picker(@players)
+      checkers = @play.check?(@turn[:team])
+      @piece = piece_selector()
+      move = move_selector()
+      @play.move_piece(@piece, move)
+      @play.show_board
+      @moveCounter += 1
+    end
+  end
+end
+
+class Board < Game
 
   attr_accessor :board, :blackKing, :blackQueen, :blackRook1, :blackRook2,
   :blackKnight1, :blackKnight2, :blackBishop1, :blackBishop2, :blackPawn1,
   :blackPawn2, :blackPawn3, :blackPawn4, :blackPawn5, :blackPawn6, :blackPawn7,
   :blackPawn8, :whiteKing, :whiteQueen, :whiteRook1, :whiteRook2, :whiteKnight1,
   :whiteKnight2, :whiteBishop1, :whiteBishop2, :whitePawn1, :whitePawn2,
-  :whitePawn3, :whitePawn4, :whitePawn5, :whitePawn6, :whitePawn7, :whitePawn8, :pieces
+  :whitePawn3, :whitePawn4, :whitePawn5, :whitePawn6, :whitePawn7, :whitePawn8, :pieces, :board
 
   def initialize()
     create_board
@@ -17,6 +98,7 @@ class Board
     bishop_maker
     knight_maker
     pawn_maker
+    recalculate_all_moves
   end
   def create_board()
     @@board = Array.new(8) { Array.new(8, "X") }
@@ -30,28 +112,66 @@ class Board
   def show_board(board=@@board)
     i = 0
     for row in board
-      printRow = row.map do |elem|
-        if elem != "X"
-          elem = elem.symbol
-        else
-          elem
-        end
-      end
+      printRow = row.map  { |elem| elem != "X" ? elem = elem.symbol : elem }
       puts "#{i} #{printRow}"
       i += 1
     end
+    puts "\n"
   end
 
-  def move_piece(piece, move)
-# binding.pry
-    for char in @@pieces
-      char.move_finder()
-    end
+  def board()
+    @@board
+  end
+
+  def get_piece_moves(square)
+    piece = @@board[square[0]][square[1]]
+    return piece.moves
+  end
+
+  def move_piece(piecesquare, move)
+    piece = @@board[piecesquare[0]][piecesquare[1]]
     if piece.moves.include?(move)
-      edit_board(piece.position, "X")
-      edit_board(move, piece)
+      if @@board[move[0]][move[1]] == "X"
+        edit_board(piece.position, "X")
+        edit_board(move, piece)
+        piece.position = move
+        piece.moved = true
+      else
+        attack(piece, move)
+      end
     else
       puts "invalid move, please try another"
+    end
+    recalculate_all_moves
+    check?(piece.team)
+  end
+
+  def attack(piece, move)
+    @@board[move[0]][move[1]].status = "Inactive"
+    @@board[move[0]][move[1]].position = []
+    edit_board(piece.position, "X")
+    edit_board(move, piece)
+    piece.position = move
+    piece.moved = true
+  end
+
+  def check?(team)
+    team == "White" ? piece = @whiteKing : piece = @blackKing
+    position = piece.position
+    for char in @@pieces
+      if char.team != team && char.moves.include?(position)
+        return true
+      end
+    end
+    false
+  end
+
+
+  def recalculate_all_moves()
+    for char in @@pieces
+      if char.status == "Active"
+        char.move_finder()
+      end
     end
   end
 
@@ -143,7 +263,6 @@ class King < Board
     @moves = []
     @moved = false
     @team == "White" ? @position = [7,4] : @position = [0,4]
-    move_finder
   end
 
   def board()
@@ -158,9 +277,6 @@ class King < Board
     for move in moves
       if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
         options << [position[0]+move[0], position[1]+move[1]]
-      end
-    # keeping for castling later
-      if moved == false
       end
     end
     options
@@ -220,7 +336,102 @@ class Queen < Board
     @team == "White" ? @position = [7,3] : @position = [0,3]
   end
 
-  def move_finder()
+  def board()
+    @@board
+  end
+
+  def piece_movement()
+    return [[1,1], [1,-1], [-1,1], [-1,-1], [1,0], [-1,0], [0,1], [0,-1]]
+  end
+
+  def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
+    for move in moves
+      for i in (1..7)
+        tempvar = []
+        tempvar[0] = move[0] * i
+        tempvar[1] = move[1] * i
+        if (position[0]+tempvar[0]).between?(0,7) && (position[1]+tempvar[1]).between?(0,7)
+          options << [position[0]+tempvar[0], position[1]+tempvar[1]]
+        end
+      end
+    end
+    options
+  end
+
+  def route_finder(position=@position, route=[], destination)
+    curSq = position
+    move = []
+    if destination[0]-curSq[0] > 0
+      move[0] = 1
+    elsif destination[0]-curSq[0] < 0
+      move[0] = -1
+    else
+      move[0] = 0
+    end
+    if destination[1]-curSq[1] > 0
+      move[1] = 1
+    elsif destination[1]-curSq[1] < 0
+      move[1] = -1
+    else
+      move[1] = 0
+    end
+    until route.include?(destination)
+      route << curSq = [curSq[0]+move[0], curSq[1]+move[1]]
+    end
+    route
+  end
+
+  def opponent?(square, team=@team)
+    opposingPiece = board[square[0]][square[1]]
+    if opposingPiece != "X" && opposingPiece.team != team
+      return true
+    end
+  end
+
+  def attack_move_finder(position)
+    targets = []
+    board
+    movesList = piece_movement()
+    for move in movesList
+        # binding.pry
+      loc = position.clone
+      currentSquare = loc
+      (currentSquare[0] + move[0]).between?(0,7) ? currentSquare[0] = currentSquare[0] + move[0] : next
+      (currentSquare[1] + move[1]).between?(0,7) ? currentSquare[1] = currentSquare[1] + move[1] : next
+      while board[currentSquare[0]][currentSquare[1]] == "X" && (currentSquare[0]+move[0]).between?(0,7) && (currentSquare[1]+move[1]).between?(0,7)
+        currentSquare[0] = currentSquare[0] + move[0]
+        currentSquare[1] = currentSquare[1] + move[1]
+      end
+      if board[currentSquare[0]][currentSquare[1]] == "X"
+        next
+      elsif opponent?(currentSquare)
+        targets << currentSquare
+      else
+        next
+      end
+    end
+    targets
+  end
+
+  def move_finder(position=@position)
+    @moves = []
+    board
+    piecemoves = piece_movement()
+    possibleDestinations = possible_landing_squares(piecemoves)
+    for destination in possibleDestinations
+      route = route_finder(destination)
+      obstructed = false
+      for square in route
+        if board[square[0]][square[1]] != "X"
+          obstructed = true
+        end
+      end
+      if obstructed == false
+        @moves << destination
+      end
+    end
+    targets = attack_move_finder(@position)
+    @moves = @moves + targets
   end
 end
 
@@ -231,14 +442,109 @@ class Rook < Board
   def initialize(team, symbol, position)
     @team = team
     @symbol = symbol
-    @status = "active"
+    @status = "Active"
     @moves = []
     @moved = false
     @value = 5
     @position = position
   end
 
-  def move_finder()
+  def board()
+    @@board
+  end
+
+  def piece_movement()
+    return [[1,0], [-1,0], [0,1], [0,-1]]
+  end
+
+  def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
+    for move in moves
+      for i in (1..7)
+        tempvar = []
+        tempvar[0] = move[0] * i
+        tempvar[1] = move[1] * i
+        if (position[0]+tempvar[0]).between?(0,7) && (position[1]+tempvar[1]).between?(0,7)
+          options << [position[0]+tempvar[0], position[1]+tempvar[1]]
+        end
+      end
+    end
+    options
+  end
+
+  def route_finder(position=@position, route=[], destination)
+    curSq = position
+    move = []
+    if destination[0]-curSq[0] > 0
+      move[0] = 1
+    elsif destination[0]-curSq[0] < 0
+      move[0] = -1
+    else
+      move[0] = 0
+    end
+    if destination[1]-curSq[1] > 0
+      move[1] = 1
+    elsif destination[1]-curSq[1] < 0
+      move[1] = -1
+    else
+      move[1] = 0
+    end
+    until route.include?(destination)
+      route << curSq = [curSq[0]+move[0], curSq[1]+move[1]]
+    end
+    route
+  end
+
+  def opponent?(square, team=@team)
+    opposingPiece = board[square[0]][square[1]]
+    if opposingPiece != "X" && opposingPiece.team != team
+      return true
+    end
+  end
+
+  def attack_move_finder(position)
+    targets = []
+    board
+    movesList = piece_movement()
+    for move in movesList
+        # binding.pry
+      loc = position.clone
+      currentSquare = loc
+      (currentSquare[0] + move[0]).between?(0,7) ? currentSquare[0] = currentSquare[0] + move[0] : next
+      (currentSquare[1] + move[1]).between?(0,7) ? currentSquare[1] = currentSquare[1] + move[1] : next
+      while board[currentSquare[0]][currentSquare[1]] == "X" && (currentSquare[0]+move[0]).between?(0,7) && (currentSquare[1]+move[1]).between?(0,7)
+        currentSquare[0] = currentSquare[0] + move[0]
+        currentSquare[1] = currentSquare[1] + move[1]
+      end
+      if board[currentSquare[0]][currentSquare[1]] == "X"
+        next
+      elsif opponent?(currentSquare)
+        targets << currentSquare
+      else
+        next
+      end
+    end
+    targets
+  end
+
+  def move_finder(position=@position)
+    @moves = []
+    board
+    piecemoves = piece_movement()
+    possibleDestinations = possible_landing_squares(piecemoves)
+    for destination in possibleDestinations
+      route = route_finder(destination)
+      obstructed = false
+      for square in route
+        if board[square[0]][square[1]] != "X"
+          obstructed = true
+        end
+      end
+      if obstructed == false
+        @moves << destination
+      end
+    end
+    targets = attack_move_finder(@position)
+    @moves = @moves + targets
   end
 end
 
@@ -249,14 +555,97 @@ class Bishop < Board
   def initialize(team, symbol, position)
     @team = team
     @symbol = symbol
-    @status = "active"
-    @moves = []
+    @status = "Active"
     @moved = false
     @value = 3
     @position = position
   end
 
-  def move_finder()
+  def board()
+    @@board
+  end
+
+  def piece_movement()
+    return [[1,1], [1,-1], [-1,1], [-1,-1]]
+  end
+
+  def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
+    for move in moves
+      for i in (1..7)
+        tempvar = []
+        tempvar[0] = move[0] * i
+        tempvar[1] = move[1] * i
+        if (position[0]+tempvar[0]).between?(0,7) && (position[1]+tempvar[1]).between?(0,7)
+          options << [position[0]+tempvar[0], position[1]+tempvar[1]]
+        end
+      end
+    end
+    options
+  end
+
+  def route_finder(position=@position, route=[], destination)
+# binding.pry
+    curSq = position
+    move = []
+    destination[0]-curSq[0] > 0 ? move[0] = 1 : move[0] = -1
+    destination[1]-curSq[1] > 0 ? move[1] = 1 : move[1] = -1
+    until route.include?(destination)
+      route << curSq = [curSq[0]+move[0], curSq[1]+move[1]]
+    end
+    route
+  end
+
+  def opponent?(square, team=@team)
+    opposingPiece = board[square[0]][square[1]]
+    if opposingPiece != "X" && opposingPiece.team != team
+      return true
+    end
+  end
+
+  def attack_move_finder(position)
+    targets = []
+    board
+    movesList = piece_movement()
+    for move in movesList
+        # binding.pry
+      loc = position.clone
+      currentSquare = loc
+      (currentSquare[0] + move[0]).between?(0,7) ? currentSquare[0] = currentSquare[0] + move[0] : next
+      (currentSquare[1] + move[1]).between?(0,7) ? currentSquare[1] = currentSquare[1] + move[1] : next
+      while board[currentSquare[0]][currentSquare[1]] == "X" && (currentSquare[0]+move[0]).between?(0,7) && (currentSquare[1]+move[1]).between?(0,7)
+        currentSquare[0] = currentSquare[0] + move[0]
+        currentSquare[1] = currentSquare[1] + move[1]
+      end
+      if board[currentSquare[0]][currentSquare[1]] == "X"
+        next
+      elsif opponent?(currentSquare)
+        targets << currentSquare
+      else
+        next
+      end
+    end
+    targets
+  end
+
+  def move_finder(position=@position)
+    @moves = []
+    board
+    piecemoves = piece_movement()
+    possibleDestinations = possible_landing_squares(piecemoves)
+    for destination in possibleDestinations
+      route = route_finder(destination)
+      obstructed = false
+      for square in route
+        if board[square[0]][square[1]] != "X"
+          obstructed = true
+        end
+      end
+      if obstructed == false
+        @moves << destination
+      end
+    end
+    targets = attack_move_finder(@position)
+    @moves = @moves + targets
   end
 end
 
@@ -267,11 +656,10 @@ class Knight < Board
   def initialize(team, symbol, position)
       @team = team
       @symbol = symbol
-      @status = "active"
+      @status = "Active"
       @moved = false
       @value = 3
       @position = position
-      move_finder
   end
 
   def board()
@@ -337,12 +725,11 @@ class Pawn < Board
   def initialize(team, symbol, position)
       @team = team
       @symbol = symbol
-      @status = "active"
+      @status = "Active"
       @moves = []
       @moved = false
       @value = 1
       @position = position
-      move_finder
   end
 
   def board()
@@ -360,6 +747,7 @@ class Pawn < Board
     if moved == false
       options << [position[0]+(move[0]*2), position[1]+move[1]]
     end
+    options
   end
 
   def route_finder(position=@position, route=[], destination, move)
@@ -405,6 +793,7 @@ class Pawn < Board
 
   def move_finder(position=@position)
     @moves = []
+    # binding.pry
     board
     pieceMoves = piece_movement
     possibleDestinations = possible_landing_squares(pieceMoves)
@@ -425,8 +814,6 @@ class Pawn < Board
   end
 end
 
-chess = Board.new()
-chess.move_piece(chess.whitePawn5, [4,4])
-chess.move_piece(chess.whiteKing, [6,4])
-chess.move_piece(chess.blackKnight1, [2,0])
-chess.show_board
+newgame = Game.new
+
+p newgame.play_game
