@@ -72,8 +72,29 @@ class Game
     while @winner == false
       @turn = turn_picker(@players)
       checkers = @play.check?(@turn[:team])
-      @piece = piece_selector()
-      move = move_selector()
+      if !checkers.empty?
+    # check the case of multiple checkers
+        escapes = @play.escape_check(checkers, @turn[:team])
+        escaped = false
+        binding.pry
+        moveEscapes = escapes[0]
+        blockEscapes = escapes[1][0]
+        takeEscape = escapes[2]
+        while escaped == false
+          @piece = piece_selector()
+          move = move_selector()
+          if board[@piece[0]][@piece[1]].type == "King" && moveEscapes.include?(move)
+            escaped = true
+          elsif board[@piece[0]][@piece[1]].type != "King" && blockEscapes.include?(move)
+            escaped = true
+          elsif checkers.length == 1 && takeEscape == move
+            escaped = true
+          end
+        end
+      else
+        @piece = piece_selector()
+        move = move_selector()
+      end
       @play.move_piece(@piece, move)
       @play.show_board
       @moveCounter += 1
@@ -123,27 +144,26 @@ class Board < Game
     @@board
   end
 
+  def clone_board(board=@@board)
+    boardClone = board.clone
+  end
+
   def get_piece_moves(square)
     piece = @@board[square[0]][square[1]]
     return piece.moves
   end
 
-  def move_piece(piecesquare, move)
-    piece = @@board[piecesquare[0]][piecesquare[1]]
-    if piece.moves.include?(move)
-      if @@board[move[0]][move[1]] == "X"
+  def move_piece(piecesquare, move, board=@@board)
+    piece = board[piecesquare[0]][piecesquare[1]]
+    if board[move[0]][move[1]] == "X"
         edit_board(piece.position, "X")
         edit_board(move, piece)
         piece.position = move
         piece.moved = true
-      else
-        attack(piece, move)
-      end
     else
-      puts "invalid move, please try another"
+        attack(piece, move)
     end
     recalculate_all_moves
-    check?(piece.team)
   end
 
   def attack(piece, move)
@@ -155,15 +175,56 @@ class Board < Game
     piece.moved = true
   end
 
-  def check?(team)
+  def check?(team, checkers=[])
     team == "White" ? piece = @whiteKing : piece = @blackKing
     position = piece.position
     for char in @@pieces
-      if char.team != team && char.moves.include?(position)
-        return true
+      if char.team != team && char.moves.include?(position) && char.status == "Active"
+        checkers << char
       end
     end
-    false
+    checkers
+  end
+
+  def escape_check(checkers, team)
+    escapes = []
+    team == "White" ? king = @whiteKing : king = @blackKing
+    # this will run into bug with not having the pawn attack covered but all others okay
+    escapes << move_check_escape(king, team)
+    escapes << block_check_escape(team, checkers, king)
+    escapes << take_check_escape(checkers)
+    escapes
+  end
+
+  def take_check_escape(checkers)
+    if checkers.length == 1
+      checkers[0].position
+    end
+  end
+
+  def block_check_escape(team, checkers, escapes=[], king)
+    for checker in checkers
+      if checker.type == "Bishop" || checker.type == "Queen" || checker.type == "Rook"
+        route = checker.route_finder(king.position)
+        route = route - [king.position]
+        escapes << route
+      end
+    end
+    escapes
+  end
+
+  def move_check_escape(king, team, opponentMoves=[], escapes=[])
+    for char in @@pieces
+      if char.team != team && char.status == "Active"
+        char.moves.each { |move| opponentMoves << move }
+      end
+    end
+    for move in king.moves
+      if !opponentMoves.include?(move)
+        escapes << move
+      end
+    end
+    escapes.flatten
   end
 
 
@@ -176,8 +237,8 @@ class Board < Game
   end
 
   def king_maker(kings=[])
-    kings << @whiteKing = King.new("White", "\♔")
-    kings << @blackKing = King.new("Black", "\♚")
+    kings << @whiteKing = King.new("White", "\♔", "King")
+    kings << @blackKing = King.new("Black", "\♚", "King")
     for king in kings
       edit_board(king.position, king)
       @@pieces << king
@@ -185,8 +246,8 @@ class Board < Game
   end
 
   def queen_maker(queens=[])
-    queens << @whiteQueen = Queen.new("White", "\♕")
-    queens << @blackQueen = Queen.new("Black", "\♛")
+    queens << @whiteQueen = Queen.new("White", "\♕", "Queen")
+    queens << @blackQueen = Queen.new("Black", "\♛", "Queen")
     for queen in queens
       edit_board(queen.position, queen)
       @@pieces << queen
@@ -194,10 +255,10 @@ class Board < Game
   end
 
   def rook_maker(rooks=[])
-    rooks << @whiteRook1 = Rook.new("White", "\♖", [7,0])
-    rooks << @whiteRook2 = Rook.new("White", "\♖", [7,7])
-    rooks << @blackRook1 = Rook.new("White", "\♜", [0,0])
-    rooks << @blackRook2 = Rook.new("White", "\♜", [0,7])
+    rooks << @whiteRook1 = Rook.new("White", "\♖", [7,0], "Rook")
+    rooks << @whiteRook2 = Rook.new("White", "\♖", [7,7], "Rook")
+    rooks << @blackRook1 = Rook.new("White", "\♜", [0,0], "Rook")
+    rooks << @blackRook2 = Rook.new("White", "\♜", [0,7], "Rook")
     for rook in rooks
       edit_board(rook.position, rook)
       @@pieces << rook
@@ -205,10 +266,10 @@ class Board < Game
   end
 
   def bishop_maker(bishops=[])
-    bishops << @whiteBishop1 = Bishop.new("White", "\♗", [7,2])
-    bishops << @whiteBishop2 = Bishop.new("White", "\♗", [7,5])
-    bishops << @blackBishop1 = Bishop.new("Black", "\♝", [0,2])
-    bishops << @blackBishop2 = Bishop.new("Black", "\♝", [0,5])
+    bishops << @whiteBishop1 = Bishop.new("White", "\♗", [7,2], "Bishop")
+    bishops << @whiteBishop2 = Bishop.new("White", "\♗", [7,5], "Bishop")
+    bishops << @blackBishop1 = Bishop.new("Black", "\♝", [0,2], "Bishop")
+    bishops << @blackBishop2 = Bishop.new("Black", "\♝", [0,5], "Bishop")
     for bishop in bishops
       edit_board(bishop.position, bishop)
       @@pieces << bishop
@@ -216,10 +277,10 @@ class Board < Game
   end
 
   def knight_maker(knights=[])
-    knights << @whiteKnight1 = Knight.new("White", "\♘", [7,1])
-    knights << @whiteKnight2 = Knight.new("White", "\♘", [7,6])
-    knights << @blackKnight1 = Knight.new("Black", "\♞", [0,1])
-    knights << @blackKnight2 = Knight.new("Black", "\♞", [0,6])
+    knights << @whiteKnight1 = Knight.new("White", "\♘", [7,1], "Knight")
+    knights << @whiteKnight2 = Knight.new("White", "\♘", [7,6], "Knight")
+    knights << @blackKnight1 = Knight.new("Black", "\♞", [0,1], "Knight")
+    knights << @blackKnight2 = Knight.new("Black", "\♞", [0,6], "Knight")
     for knight in knights
       edit_board(knight.position, knight)
       @@pieces << knight
@@ -227,22 +288,22 @@ class Board < Game
   end
 
   def pawn_maker(pawns=[])
-    pawns << @whitePawn1 = Pawn.new("White", "\♙", [6,0])
-    pawns << @whitePawn2 = Pawn.new("White", "\♙", [6,1])
-    pawns << @whitePawn3 = Pawn.new("White", "\♙", [6,2])
-    pawns << @whitePawn4 = Pawn.new("White", "\♙", [6,3])
-    pawns << @whitePawn5 = Pawn.new("White", "\♙", [6,4])
-    pawns << @whitePawn6 = Pawn.new("White", "\♙", [6,5])
-    pawns << @whitePawn7 = Pawn.new("White", "\♙", [6,6])
-    pawns << @whitePawn8 = Pawn.new("White", "\♙", [6,7])
-    pawns << @blackPawn1 = Pawn.new("Black", "\♟", [1,0])
-    pawns << @blackPawn2 = Pawn.new("Black", "\♟", [1,1])
-    pawns << @blackPawn3 = Pawn.new("Black", "\♟", [1,2])
-    pawns << @blackPawn4 = Pawn.new("Black", "\♟", [1,3])
-    pawns << @blackPawn5 = Pawn.new("Black", "\♟", [1,4])
-    pawns << @blackPawn6 = Pawn.new("Black", "\♟", [1,5])
-    pawns << @blackPawn7 = Pawn.new("Black", "\♟", [1,6])
-    pawns << @blackPawn8 = Pawn.new("Black", "\♟", [1,7])
+    pawns << @whitePawn1 = Pawn.new("White", "\♙", [6,0], "Pawn")
+    pawns << @whitePawn2 = Pawn.new("White", "\♙", [6,1], "Pawn")
+    pawns << @whitePawn3 = Pawn.new("White", "\♙", [6,2], "Pawn")
+    pawns << @whitePawn4 = Pawn.new("White", "\♙", [6,3], "Pawn")
+    pawns << @whitePawn5 = Pawn.new("White", "\♙", [6,4], "Pawn")
+    pawns << @whitePawn6 = Pawn.new("White", "\♙", [6,5], "Pawn")
+    pawns << @whitePawn7 = Pawn.new("White", "\♙", [6,6], "Pawn")
+    pawns << @whitePawn8 = Pawn.new("White", "\♙", [6,7], "Pawn")
+    pawns << @blackPawn1 = Pawn.new("Black", "\♟", [1,0], "Pawn")
+    pawns << @blackPawn2 = Pawn.new("Black", "\♟", [1,1], "Pawn")
+    pawns << @blackPawn3 = Pawn.new("Black", "\♟", [1,2], "Pawn")
+    pawns << @blackPawn4 = Pawn.new("Black", "\♟", [1,3], "Pawn")
+    pawns << @blackPawn5 = Pawn.new("Black", "\♟", [1,4], "Pawn")
+    pawns << @blackPawn6 = Pawn.new("Black", "\♟", [1,5], "Pawn")
+    pawns << @blackPawn7 = Pawn.new("Black", "\♟", [1,6], "Pawn")
+    pawns << @blackPawn8 = Pawn.new("Black", "\♟", [1,7], "Pawn")
     for pawn in pawns
       edit_board(pawn.position, pawn)
       @@pieces << pawn
@@ -253,11 +314,12 @@ end
 
 class King < Board
 
-  attr_reader :team, :symbol
+  attr_reader :team, :symbol, :type
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol)
+  def initialize(team, symbol, type)
     @team = team
+    @type = type
     @symbol = symbol
     @status = "Active"
     @moves = []
@@ -323,11 +385,12 @@ class King < Board
 end
 
 class Queen < Board
-  attr_reader :team, :symbol, :value
+  attr_reader :team, :symbol, :value, :type
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol)
+  def initialize(team, symbol, type)
     @team = team
+    @type = type
     @symbol = symbol
     @status = "Active"
     @moves = []
@@ -436,11 +499,12 @@ class Queen < Board
 end
 
 class Rook < Board
-  attr_reader :team, :symbol, :value
+  attr_reader :team, :symbol, :value, :type
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, position)
+  def initialize(team, symbol, position, type)
     @team = team
+    @type = type
     @symbol = symbol
     @status = "Active"
     @moves = []
@@ -549,11 +613,12 @@ class Rook < Board
 end
 
 class Bishop < Board
-  attr_reader :team, :symbol, :value
+  attr_reader :team, :symbol, :value, :type
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, position)
+  def initialize(team, symbol, position, type)
     @team = team
+    @type = type
     @symbol = symbol
     @status = "Active"
     @moved = false
@@ -650,11 +715,12 @@ class Bishop < Board
 end
 
 class Knight < Board
-  attr_reader :team, :symbol, :value
+  attr_reader :team, :symbol, :value, :type
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, position)
+  def initialize(team, symbol, position, type)
       @team = team
+      @type = type
       @symbol = symbol
       @status = "Active"
       @moved = false
@@ -719,11 +785,12 @@ class Knight < Board
 end
 
 class Pawn < Board
-  attr_reader :team, :symbol, :value
+  attr_reader :team, :symbol, :value, :type
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, position)
+  def initialize(team, symbol, position, type)
       @team = team
+      @type = type
       @symbol = symbol
       @status = "Active"
       @moves = []
