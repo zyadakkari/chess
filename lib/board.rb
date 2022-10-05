@@ -9,6 +9,7 @@ class Game
     @players = []
     @moveCounter = 0
     @winner = false
+    @checkmate = false
     puts "Welcome to Chess!"
     choose_game_mode
     @gameMode == 1 ? pass_to_play_mode(@teams) : return
@@ -51,7 +52,8 @@ class Game
     @piece
   end
 
-  def move_selector()
+  def move_selector(opponentMoves=[])
+    board
     pieceMoves = @play.get_piece_moves(@piece)
     puts "#{@turn[:name]} pick a square to move to: "
     input = gets.chomp
@@ -65,6 +67,12 @@ class Game
     move
   end
 
+  def checkmate()
+    if @checkmate == true
+      @winner = true
+    end
+  end
+
   def play_game()
     @play = Board.new()
     board = @play.board
@@ -75,8 +83,10 @@ class Game
       if !checkers.empty?
     # check the case of multiple checkers
         escapes = @play.escape_check(checkers, @turn[:team])
+        if escapes.empty?
+          @checkmate = true
+        end
         escaped = false
-        binding.pry
         moveEscapes = escapes[0]
         blockEscapes = escapes[1][0]
         takeEscape = escapes[2]
@@ -364,6 +374,15 @@ class King < Board
     targets
   end
 
+  def illegal_moves(moves)
+    for char in @@pieces
+      if char.team != @team && char.status == "Active"
+        char.moves.each { |move| opponentMoves << move }
+      end
+    end
+    illegalMoves = opponentMoves & @moves
+  end
+
   def move_finder(position=@position)
     @moves = []
     board
@@ -380,6 +399,8 @@ class King < Board
     end
     targets = attack_move_finder()
     @moves = @moves + targets
+    illegalMoves = illegal_moves(@moves)
+    @moves = @moves - illegalMoves
   end
 
 end
