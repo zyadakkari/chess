@@ -52,8 +52,7 @@ class Game
     @piece
   end
 
-  def move_selector(opponentMoves=[])
-    board
+  def move_selector()
     pieceMoves = @play.get_piece_moves(@piece)
     puts "#{@turn[:name]} pick a square to move to: "
     input = gets.chomp
@@ -267,8 +266,8 @@ class Board < Game
   def rook_maker(rooks=[])
     rooks << @whiteRook1 = Rook.new("White", "\♖", [7,0], "Rook")
     rooks << @whiteRook2 = Rook.new("White", "\♖", [7,7], "Rook")
-    rooks << @blackRook1 = Rook.new("White", "\♜", [0,0], "Rook")
-    rooks << @blackRook2 = Rook.new("White", "\♜", [0,7], "Rook")
+    rooks << @blackRook1 = Rook.new("Black", "\♜", [0,0], "Rook")
+    rooks << @blackRook2 = Rook.new("Black", "\♜", [0,7], "Rook")
     for rook in rooks
       edit_board(rook.position, rook)
       @@pieces << rook
@@ -341,6 +340,12 @@ class King < Board
     @@board
   end
 
+  def pieces()
+    @@pieces
+  end
+
+
+
   def piece_movement()
     return [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,-1], [0,1], [0,-1]]
   end
@@ -374,8 +379,9 @@ class King < Board
     targets
   end
 
-  def illegal_moves(moves)
-    for char in @@pieces
+  def illegal_moves(moves, opponentMoves=[])
+    pieces
+    for char in pieces
       if char.team != @team && char.status == "Active"
         char.moves.each { |move| opponentMoves << move }
       end
@@ -401,6 +407,7 @@ class King < Board
     @moves = @moves + targets
     illegalMoves = illegal_moves(@moves)
     @moves = @moves - illegalMoves
+    p @moves
   end
 
 end
@@ -643,6 +650,7 @@ class Bishop < Board
     @symbol = symbol
     @status = "Active"
     @moved = false
+    @moves = []
     @value = 3
     @position = position
   end
@@ -745,6 +753,7 @@ class Knight < Board
       @symbol = symbol
       @status = "Active"
       @moved = false
+      @moves = []
       @value = 3
       @position = position
   end
