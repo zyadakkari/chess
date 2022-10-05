@@ -41,6 +41,7 @@ class Game
   end
 
   def piece_selector()
+    board = @play.board
     puts "#{@turn[:name]} pick a piece to move: "
     input = gets.chomp
     @piece = [input[1].to_i,input[3].to_i]
@@ -49,7 +50,13 @@ class Game
       input = gets.chomp
       @piece = [input[1].to_i,input[3].to_i]
     end
+    if board[@piece[0]][@piece[1]].type == "Queen"
+      if board[@piece[0]][@piece[1]].pinned == true
+        p board[@piece[0]][@piece[1]].moves
+      end
+    end
     @piece
+
   end
 
   def move_selector()
@@ -323,7 +330,7 @@ end
 
 class King < Board
 
-  attr_reader :team, :symbol, :type
+  attr_reader :team, :symbol, :type, :pinned
   attr_accessor :status, :moves, :moved, :position
 
   def initialize(team, symbol, type)
@@ -331,6 +338,7 @@ class King < Board
     @type = type
     @symbol = symbol
     @status = "Active"
+    @pinned = false
     @moves = []
     @moved = false
     @team == "White" ? @position = [7,4] : @position = [0,4]
@@ -407,7 +415,7 @@ class King < Board
     @moves = @moves + targets
     illegalMoves = illegal_moves(@moves)
     @moves = @moves - illegalMoves
-    p @moves
+    @moves
   end
 
 end
@@ -423,12 +431,17 @@ class Queen < Board
     @status = "Active"
     @moves = []
     @moved = false
+    @pinned = false
     @value = 9
     @team == "White" ? @position = [7,3] : @position = [0,3]
   end
 
   def board()
     @@board
+  end
+
+  def pieces()
+    @@pieces
   end
 
   def piece_movement()
@@ -503,6 +516,69 @@ class Queen < Board
     end
     targets
   end
+ HELLLO## !!!!!! check this work and fix so that pieces can only make moves that are legal to them (i.e check fi the move defined here is part of
+# their legal moves and add this restriction, also add this function to all pieces and fix the calling of it from the game class)
+  def pinned(pinners=[], move=[])
+    pinned = false
+    pieces
+    board
+    for char in pieces
+      if char.team != @team
+        if char.type == "Queen" || char.type == "Bishop" || char.type == "Rook"
+          pinners << char
+        end
+      end
+    end
+    for piece in pinners
+      if piece.moves.include?(@position)
+        if piece.position[0] - @position[0] < 0
+          move[0] = 1
+        elsif piece.position[0] - @position[0] > 0
+          move[0] = -1
+        else
+          move[0] = 0
+        end
+        if piece.position[1] - @position[1] < 0
+          move[1] = 1
+        elsif piece.position[1] - @position[1] > 0
+          move[1] = -1
+        else
+          move[1] = 0
+        end
+        positionToCheck = @position.clone
+        move
+        positionToCheck[0] = positionToCheck[0]+move[0]
+        positionToCheck[1] = positionToCheck[1]+move[1]
+        until board[positionToCheck[0]][positionToCheck[1]] != "X" || !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
+          positionToCheck[0] = positionToCheck[0]+move[0]
+          positionToCheck[1] = positionToCheck[1]+move[1]
+        end
+        positionToCheck
+        if !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
+          next
+        else
+          if board[positionToCheck[0]][positionToCheck[1]].type == "King"
+            @pinned = true
+            move[0] = move[0]*-1
+            move[1] = move[1]*-1
+            positionToCheck = @position.clone
+            openSquares = []
+            positionToCheck[0] = positionToCheck[0]+move[0]
+            positionToCheck[1] = positionToCheck[1]+move[1]
+            until board[positionToCheck[0]][positionToCheck[1]] != "X"
+              openSquares << positionToCheck
+              positionToCheck[0] = positionToCheck[0]+move[0]
+              positionToCheck[1] = positionToCheck[1]+move[1]
+            end
+            openSquares << positionToCheck
+            @moves = []
+            @moves << openSquares
+          end
+        end
+      end
+    end
+    @pinned
+  end
 
   def move_finder(position=@position)
     @moves = []
@@ -523,6 +599,7 @@ class Queen < Board
     end
     targets = attack_move_finder(@position)
     @moves = @moves + targets
+    pinned()
   end
 end
 
