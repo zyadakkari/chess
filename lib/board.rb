@@ -1,6 +1,21 @@
-require 'pry-byebug'
+# require_relative './king.rb'
+
+module Movable
+  def possible_landing_squares(piece, options=[])
+    position = piece.position
+    moves = piece.PIECE_MOVEMENT
+    for move in moves
+      if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
+        options << [position[0]+move[0], position[1]+move[1]]
+      end
+    end
+    options
+  end
+
+end
 
 class Game
+  include Movable
 
   attr_reader :teams, :players
 
@@ -44,16 +59,13 @@ class Game
     board = @play.board
     puts "#{@turn[:name]} pick a piece to move: "
     input = gets.chomp
-    @piece = [input[1].to_i,input[3].to_i]
-    while @play.board[@piece[0]][@piece[1]].team != @turn[:team]
+    input = input.split(',')
+    @piece = [input[0].to_i,input[1].to_i]
+    while @play.board[@piece[0]][@piece[1]] == "X" || @play.board[@piece[0]][@piece[1]].team != @turn[:team]
       puts "Please choose a valid piece"
       input = gets.chomp
-      @piece = [input[1].to_i,input[3].to_i]
-    end
-    if board[@piece[0]][@piece[1]].type == "Queen"
-      if board[@piece[0]][@piece[1]].pinned == true
-        p board[@piece[0]][@piece[1]].moves
-      end
+      input = input.split(',')
+      @piece = [input[0].to_i,input[1].to_i]
     end
     @piece
 
@@ -63,11 +75,13 @@ class Game
     pieceMoves = @play.get_piece_moves(@piece)
     puts "#{@turn[:name]} pick a square to move to: "
     input = gets.chomp
-    move = [input[1].to_i,input[3].to_i]
+    input = input.split(',')
+    move = [input[0].to_i,input[1].to_i]
     while !pieceMoves.include?(move)
       puts "Please choose a valid move combination"
       input = gets.chomp
-      move = [input[1].to_i,input[3].to_i]
+      input = input.split(',')
+      move = [input[0].to_i,input[1].to_i]
       pieceMoves = @play.get_piece_moves(@piece)
     end
     move
@@ -160,10 +174,6 @@ class Board < Game
     @@board
   end
 
-  def clone_board(board=@@board)
-    boardClone = board.clone
-  end
-
   def get_piece_moves(square)
     piece = @@board[square[0]][square[1]]
     return piece.moves
@@ -171,7 +181,9 @@ class Board < Game
 
   def move_piece(piecesquare, move, board=@@board)
     piece = board[piecesquare[0]][piecesquare[1]]
-    if board[move[0]][move[1]] == "X"
+    if castle_check(piece, move)
+      castle(piece, move)
+    elsif board[move[0]][move[1]] == "X"
         edit_board(piece.position, "X")
         edit_board(move, piece)
         piece.position = move
@@ -179,7 +191,14 @@ class Board < Game
     else
         attack(piece, move)
     end
-    recalculate_all_moves
+    #to ensure new moves are calculating based on the new position
+    piece.move_finder
+    recalculate_all_moves()
+    for char in @@pieces
+      if char.status == "Active" && char.type != "King"
+        pinned(char)
+      end
+    end
   end
 
   def attack(piece, move)
@@ -190,6 +209,27 @@ class Board < Game
     piece.position = move
     piece.moved = true
   end
+
+  def castle_check(piece, move)
+    if piece.type == "King" && (move[1]+piece.position[1] == 6 || move[1]+piece.position[1] == 10)
+      return true
+    end
+  end
+
+  def castle(piece, move)
+    edit_board(piece.position, "X")
+    edit_board(move, piece)
+    if move[1] == 6
+      rook = @@board[piece.position[0]][7]
+      edit_board(rook.position, "X")
+      edit_board([move[0],move[1]-1], rook)
+    else
+      rook = @@board[piece.position[0]][0]
+      edit_board(rook.position, "X")
+      edit_board([move[0],move[1]+1], rook)
+    end
+  end
+
 
   def check?(team, checkers=[])
     team == "White" ? piece = @whiteKing : piece = @blackKing
@@ -248,6 +288,78 @@ class Board < Game
     for char in @@pieces
       if char.status == "Active"
         char.move_finder()
+      end
+    end
+  end
+
+  def pinned(chesspiece, pinners=[], move=[])
+    pinned = false
+    #possible pinners
+    for char in @@pieces
+      if char.team != @team && char.status == "Active"
+        if char.type == "Queen" || char.type == "Bishop" || char.type == "Rook"
+          pinners << char
+        end
+      end
+    end
+    # actual pinners & their move direction
+    for piece in pinners
+      if piece.moves.include?(chesspiece.position)
+        if piece.position[0] - chesspiece.position[0] < 0
+          move[0] = 1
+      elsif piece.position[0] - chesspiece.position[0] > 0
+          move[0] = -1
+        else
+          move[0] = 0
+        end
+        if piece.position[1] - chesspiece.position[1] < 0
+          move[1] = 1
+      elsif piece.position[1] - chesspiece.position[1] > 0
+          move[1] = -1
+      else
+          move[1] = 0
+      end
+        positionToCheck = chesspiece.position.clone
+        positionToCheck[0] = positionToCheck[0]+move[0]
+        positionToCheck[1] = positionToCheck[1]+move[1]
+        until board[positionToCheck[0]][positionToCheck[1]] != "X" || !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
+          positionToCheck[0] = positionToCheck[0]+move[0]
+          positionToCheck[1] = positionToCheck[1]+move[1]
+        end
+        positionToCheck
+        if !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
+          next
+      elsif @@board[positionToCheck[0]][positionToCheck[1]].type == "King"
+# binding.pry
+            @pinned = true
+            # check legal forward moves
+            move[0] = move[0]*-1
+            move[1] = move[1]*-1
+            positionToCheck = chesspiece.position.clone
+            openSquares = []
+            positionToCheck[0] = positionToCheck[0]+move[0]
+            positionToCheck[1] = positionToCheck[1]+move[1]
+            openSquares << positionToCheck.clone
+            until @@board[positionToCheck[0]][positionToCheck[1]] != "X"
+              openSquares << positionToCheck.clone
+              positionToCheck[0] = positionToCheck[0]+move[0]
+              positionToCheck[1] = positionToCheck[1]+move[1]
+            end
+            openSquares << positionToCheck
+            # check legal backward moves
+            positionToCheck = chesspiece.position.clone
+            move[0] = move[0]*-1
+            move[1] = move[1]*-1
+            positionToCheck[0] = positionToCheck[0]+move[0]
+            positionToCheck[1] = positionToCheck[1]+move[1]
+            while board[positionToCheck[0]][positionToCheck[1]] == "X"
+              openSquares << positionToCheck.clone
+              positionToCheck[0] = positionToCheck[0]+move[0]
+              positionToCheck[1] = positionToCheck[1]+move[1]
+            end
+            chesspiece.moves = []
+            openSquares.each { |move| chesspiece.moves << move }
+        end
       end
     end
   end
@@ -352,11 +464,7 @@ class King < Board
     @@pieces
   end
 
-
-
-  def piece_movement()
-    return [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,-1], [0,1], [0,-1]]
-  end
+  PIECE_MOVEMENT =  [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,-1], [0,1], [0,-1]]
 
   def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
     for move in moves
@@ -377,7 +485,7 @@ class King < Board
   def attack_move_finder(position=@position)
     targets = []
     board
-    moves = piece_movement()
+    moves = PIECE_MOVEMENT
     attackableSquares = possible_landing_squares(moves)
     for square in attackableSquares
       if opponent?(square)
@@ -397,10 +505,73 @@ class King < Board
     illegalMoves = opponentMoves & @moves
   end
 
+  def king_side_castle(position=@position)
+    board()
+    pieces()
+    castleSquares = [position, [position[0],position[1]+1], [position[0],position[1]+2]]
+    # if king moved return
+    if @moved
+      return
+    end
+    # if rook moved return
+    if @@board[position[0]][position[1]+3] == "X" || @@board[position[0]][position[1]+3].moved
+      return
+    end
+    # check every enemy piece attackable positions to see if include king and two squares to the king left or right
+    for piece in @@pieces
+      if piece.team != @team
+        shared = piece.moves & castleSquares
+        if !shared.empty?
+          return
+        end
+      end
+    end
+    # check if squares between king and rook all empty
+    for square in castleSquares[1..]
+      if @@board[square[0]][square[1]] != "X"
+        return
+      end
+    end
+    @moves << [position[0],position[1]+2]
+    # if all the above passes, king can castle
+
+  end
+  def queen_side_castle(position=@position)
+    board()
+    pieces()
+    castleSquares = [position, [position[0],position[1]-1], [position[0],position[1]-2], [position[0], position[1]-3]]
+    # if king moved return
+    if @moved
+      return
+    end
+    # if rook moved return
+    if @@board[position[0]][position[1]-4] == "X" || @@board[position[0]][position[1]-4].moved
+      return
+    end
+    # check every enemy piece attackable positions to see if include king and two squares to the king left or right
+    for piece in @@pieces
+      if piece.team != @team
+        shared = piece.moves & castleSquares[0..2]
+        if !shared.empty?
+          return
+        end
+      end
+    end
+    # check if squares between king and rook all empty
+    for square in castleSquares[1..]
+      if @@board[square[0]][square[1]] != "X"
+        return
+      end
+    end
+    @moves << [position[0],position[1]-2]
+    # if all the above passes, king can castle
+
+  end
+
   def move_finder(position=@position)
     @moves = []
     board
-    moves = piece_movement()
+    moves = PIECE_MOVEMENT
     possibleDestinations = possible_landing_squares(moves)
     for destination in possibleDestinations
       obstructed = false
@@ -415,6 +586,8 @@ class King < Board
     @moves = @moves + targets
     illegalMoves = illegal_moves(@moves)
     @moves = @moves - illegalMoves
+    king_side_castle()
+    queen_side_castle()
     @moves
   end
 
@@ -516,69 +689,6 @@ class Queen < Board
     end
     targets
   end
- HELLLO## !!!!!! check this work and fix so that pieces can only make moves that are legal to them (i.e check fi the move defined here is part of
-# their legal moves and add this restriction, also add this function to all pieces and fix the calling of it from the game class)
-  def pinned(pinners=[], move=[])
-    pinned = false
-    pieces
-    board
-    for char in pieces
-      if char.team != @team
-        if char.type == "Queen" || char.type == "Bishop" || char.type == "Rook"
-          pinners << char
-        end
-      end
-    end
-    for piece in pinners
-      if piece.moves.include?(@position)
-        if piece.position[0] - @position[0] < 0
-          move[0] = 1
-        elsif piece.position[0] - @position[0] > 0
-          move[0] = -1
-        else
-          move[0] = 0
-        end
-        if piece.position[1] - @position[1] < 0
-          move[1] = 1
-        elsif piece.position[1] - @position[1] > 0
-          move[1] = -1
-        else
-          move[1] = 0
-        end
-        positionToCheck = @position.clone
-        move
-        positionToCheck[0] = positionToCheck[0]+move[0]
-        positionToCheck[1] = positionToCheck[1]+move[1]
-        until board[positionToCheck[0]][positionToCheck[1]] != "X" || !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
-          positionToCheck[0] = positionToCheck[0]+move[0]
-          positionToCheck[1] = positionToCheck[1]+move[1]
-        end
-        positionToCheck
-        if !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
-          next
-        else
-          if board[positionToCheck[0]][positionToCheck[1]].type == "King"
-            @pinned = true
-            move[0] = move[0]*-1
-            move[1] = move[1]*-1
-            positionToCheck = @position.clone
-            openSquares = []
-            positionToCheck[0] = positionToCheck[0]+move[0]
-            positionToCheck[1] = positionToCheck[1]+move[1]
-            until board[positionToCheck[0]][positionToCheck[1]] != "X"
-              openSquares << positionToCheck
-              positionToCheck[0] = positionToCheck[0]+move[0]
-              positionToCheck[1] = positionToCheck[1]+move[1]
-            end
-            openSquares << positionToCheck
-            @moves = []
-            @moves << openSquares
-          end
-        end
-      end
-    end
-    @pinned
-  end
 
   def move_finder(position=@position)
     @moves = []
@@ -599,7 +709,6 @@ class Queen < Board
     end
     targets = attack_move_finder(@position)
     @moves = @moves + targets
-    pinned()
   end
 end
 
@@ -989,5 +1098,5 @@ class Pawn < Board
 end
 
 newgame = Game.new
-
 p newgame.play_game
+p newgame.possible_landing_squares(whiteKing)
