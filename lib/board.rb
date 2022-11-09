@@ -26,6 +26,13 @@ module Movable
     options
   end
 
+  def Movable.opponent?(piece, board)
+    opposingPiece = board[piece.position[0]][piece.position[1]]
+    if opposingPiece != "X" && opposingPiece.team != piece.team
+      return true
+    end
+  end
+
 end
 
 class Game
@@ -484,20 +491,13 @@ class King < Board
 
   PIECE_MOVEMENT =  [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,-1], [0,1], [0,-1]]
 
-  def opponent?(square, team=@team)
-    opposingPiece = board[square[0]][square[1]]
-    if opposingPiece != "X" && opposingPiece.team != team
-      return true
-    end
-  end
-
   def attack_move_finder(position=@position)
     targets = []
     board
     moves = PIECE_MOVEMENT
     attackableSquares = Movable.possible_landing_squares(self.class, self)
     for square in attackableSquares
-      if opponent?(square)
+      if Movable.opponent?(self, board)
         targets << square
       end
     end
@@ -651,13 +651,6 @@ class Queen < Board
     route
   end
 
-  def opponent?(square, team=@team)
-    opposingPiece = board[square[0]][square[1]]
-    if opposingPiece != "X" && opposingPiece.team != team
-      return true
-    end
-  end
-
   def attack_move_finder(position)
     targets = []
     board
@@ -674,7 +667,7 @@ class Queen < Board
       end
       if board[currentSquare[0]][currentSquare[1]] == "X"
         next
-      elsif opponent?(currentSquare)
+    elsif Movable.opponent?(self, board)
         targets << currentSquare
       else
         next
@@ -749,13 +742,6 @@ class Rook < Board
     route
   end
 
-  def opponent?(square, team=@team)
-    opposingPiece = board[square[0]][square[1]]
-    if opposingPiece != "X" && opposingPiece.team != team
-      return true
-    end
-  end
-
   def attack_move_finder(position)
     targets = []
     board
@@ -772,7 +758,7 @@ class Rook < Board
       end
       if board[currentSquare[0]][currentSquare[1]] == "X"
         next
-      elsif opponent?(currentSquare)
+    elsif Movable.opponent?(self, board)
         targets << currentSquare
       else
         next
@@ -836,13 +822,6 @@ class Bishop < Board
     route
   end
 
-  def opponent?(square, team=@team)
-    opposingPiece = board[square[0]][square[1]]
-    if opposingPiece != "X" && opposingPiece.team != team
-      return true
-    end
-  end
-
   def attack_move_finder(position)
     targets = []
     board
@@ -859,7 +838,7 @@ class Bishop < Board
       end
       if board[currentSquare[0]][currentSquare[1]] == "X"
         next
-      elsif opponent?(currentSquare)
+    elsif Movable.opponent?(self, board)
         targets << currentSquare
       else
         next
@@ -911,20 +890,13 @@ class Knight < Board
 
   PIECE_MOVEMENT = [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [-1,2], [1,-2], [-1,-2]]
 
-  def opponent?(square, team=@team)
-    opposingPiece = board[square[0]][square[1]]
-    if opposingPiece != "X" && opposingPiece.team != team
-      return true
-    end
-  end
-
   def attack_move_finder(position=@position)
     targets = []
     board
     moves = PIECE_MOVEMENT
     attackableSquares = Movable.possible_landing_squares(self.class, self)
     for square in attackableSquares
-      if opponent?(square)
+      if Movable.opponent?(self, board)
         targets << square
       end
     end
@@ -1004,20 +976,13 @@ class Pawn < Board
     options
   end
 
-  def opponent?(square, team=@team)
-    opposingPiece = board[square[0]][square[1]]
-    if opposingPiece != "X" && opposingPiece.team != team
-      return true
-    end
-  end
-
   def attack_move_finder(position=@position)
     targets = []
     board
     moves = attack_movement()
     attackableSquares = attackable_squares(moves)
     for square in attackableSquares
-      if opponent?(square)
+      if Movable.opponent?(self, board)
         targets << square
       end
     end
