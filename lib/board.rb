@@ -472,22 +472,22 @@ class Board < Game
   end
 
   def pawn_maker(pawns=[])
-    pawns << @whitePawn1 = Pawn.new("White", "\♙", [6,0], "Pawn")
-    pawns << @whitePawn2 = Pawn.new("White", "\♙", [6,1], "Pawn")
-    pawns << @whitePawn3 = Pawn.new("White", "\♙", [6,2], "Pawn")
-    pawns << @whitePawn4 = Pawn.new("White", "\♙", [6,3], "Pawn")
-    pawns << @whitePawn5 = Pawn.new("White", "\♙", [6,4], "Pawn")
-    pawns << @whitePawn6 = Pawn.new("White", "\♙", [6,5], "Pawn")
-    pawns << @whitePawn7 = Pawn.new("White", "\♙", [6,6], "Pawn")
-    pawns << @whitePawn8 = Pawn.new("White", "\♙", [6,7], "Pawn")
-    pawns << @blackPawn1 = Pawn.new("Black", "\♟", [1,0], "Pawn")
-    pawns << @blackPawn2 = Pawn.new("Black", "\♟", [1,1], "Pawn")
-    pawns << @blackPawn3 = Pawn.new("Black", "\♟", [1,2], "Pawn")
-    pawns << @blackPawn4 = Pawn.new("Black", "\♟", [1,3], "Pawn")
-    pawns << @blackPawn5 = Pawn.new("Black", "\♟", [1,4], "Pawn")
-    pawns << @blackPawn6 = Pawn.new("Black", "\♟", [1,5], "Pawn")
-    pawns << @blackPawn7 = Pawn.new("Black", "\♟", [1,6], "Pawn")
-    pawns << @blackPawn8 = Pawn.new("Black", "\♟", [1,7], "Pawn")
+    pawns << @whitePawn1 = WhitePawn.new("White", "\♙", [6,0], "Pawn")
+    pawns << @whitePawn2 = WhitePawn.new("White", "\♙", [6,1], "Pawn")
+    pawns << @whitePawn3 = WhitePawn.new("White", "\♙", [6,2], "Pawn")
+    pawns << @whitePawn4 = WhitePawn.new("White", "\♙", [6,3], "Pawn")
+    pawns << @whitePawn5 = WhitePawn.new("White", "\♙", [6,4], "Pawn")
+    pawns << @whitePawn6 = WhitePawn.new("White", "\♙", [6,5], "Pawn")
+    pawns << @whitePawn7 = WhitePawn.new("White", "\♙", [6,6], "Pawn")
+    pawns << @whitePawn8 = WhitePawn.new("White", "\♙", [6,7], "Pawn")
+    pawns << @blackPawn1 = BlackPawn.new("Black", "\♟", [1,0], "Pawn")
+    pawns << @blackPawn2 = BlackPawn.new("Black", "\♟", [1,1], "Pawn")
+    pawns << @blackPawn3 = BlackPawn.new("Black", "\♟", [1,2], "Pawn")
+    pawns << @blackPawn4 = BlackPawn.new("Black", "\♟", [1,3], "Pawn")
+    pawns << @blackPawn5 = BlackPawn.new("Black", "\♟", [1,4], "Pawn")
+    pawns << @blackPawn6 = BlackPawn.new("Black", "\♟", [1,5], "Pawn")
+    pawns << @blackPawn7 = BlackPawn.new("Black", "\♟", [1,6], "Pawn")
+    pawns << @blackPawn8 = BlackPawn.new("Black", "\♟", [1,7], "Pawn")
     for pawn in pawns
       edit_board(pawn.position, pawn)
       @@pieces << pawn
@@ -888,7 +888,7 @@ class Knight < Board
   end
 end
 
-class Pawn < Board
+class BlackPawn < Board
   attr_reader :team, :symbol, :value, :type
   attr_accessor :status, :moves, :moved, :position
 
@@ -907,9 +907,7 @@ class Pawn < Board
     @@board
   end
 
-  def piece_movement(team=@team)
-    return team == "Black" ? [1,0] : [-1,0]
-  end
+  PIECE_MOVEMENT = [1,0]
 
   def possible_landing_squares(move, options=[], position=@position, moved=@moved)
     if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
@@ -922,7 +920,7 @@ class Pawn < Board
   end
 
   def attack_movement(team=@team)
-    return team == "Black" ? [[1, 1], [1, -1]] : [[-1, 1], [-1,-1]]
+    return [[1, 1], [1, -1]]
   end
 
   def attackable_squares(moves, position=@position, options=[])
@@ -951,8 +949,8 @@ class Pawn < Board
     @moves = []
     # binding.pry
     board
-    pieceMoves = piece_movement
-    possibleDestinations = possible_landing_squares(pieceMoves)
+    pieceMoves = PIECE_MOVEMENT
+    possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
       route = Movable.route_finder(self, destination)
       obstructed = false
@@ -969,6 +967,89 @@ class Pawn < Board
     @moves = @moves + targets
   end
 end
+
+class WhitePawn < Board
+  attr_reader :team, :symbol, :value, :type
+  attr_accessor :status, :moves, :moved, :position
+
+  def initialize(team, symbol, position, type)
+      @team = team
+      @type = type
+      @symbol = symbol
+      @status = "Active"
+      @moves = []
+      @moved = false
+      @value = 1
+      @position = position
+  end
+
+  def board()
+    @@board
+  end
+
+  PIECE_MOVEMENT = [-1,0]
+
+  def possible_landing_squares(move, options=[], position=@position, moved=@moved)
+    if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
+      options << [position[0]+move[0], position[1]+move[1]]
+    end
+    if moved == false
+      options << [position[0]+(move[0]*2), position[1]+move[1]]
+    end
+    options
+  end
+
+  def attack_movement(team=@team)
+    return [[-1, 1], [-1,-1]]
+  end
+
+  def attackable_squares(moves, position=@position, options=[])
+    for move in moves
+      if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
+        options << [position[0]+move[0], position[1]+move[1]]
+      end
+    end
+    options
+  end
+
+  def attack_move_finder(position=@position)
+    targets = []
+    board
+    moves = attack_movement()
+    attackableSquares = attackable_squares(moves)
+    for square in attackableSquares
+      if Movable.opponent?(self, board)
+        targets << square
+      end
+    end
+    targets
+  end
+
+  def move_finder(position=@position)
+    @moves = []
+    # binding.pry
+    board
+    pieceMoves = PIECE_MOVEMENT
+    possibleDestinations = Movable.possible_landing_squares(self.class, self)
+    for destination in possibleDestinations
+      route = Movable.route_finder(self, destination)
+      obstructed = false
+      for square in route
+        if board[square[0]][square[1]] != "X"
+          obstructed = true
+        end
+      end
+      if obstructed == false
+        @moves << destination
+      end
+    end
+    targets = attack_move_finder()
+    @moves = @moves + targets
+  end
+end
+
+
+
 
 newgame = Game.new
 p newgame.play_game
