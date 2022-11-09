@@ -66,6 +66,15 @@ module Movable
     return path
   end
 
+  def self.attackable_squares(moves, piece, options=[])
+    for move in moves
+      if (piece.position[0]+move[0]).between?(0,7) && (piece.position[1]+move[1]).between?(0,7)
+        options << [piece.position[0]+move[0], piece.position[1]+move[1]]
+      end
+    end
+    options
+  end
+
 end
 
 class Game
@@ -909,34 +918,13 @@ class BlackPawn < Board
 
   PIECE_MOVEMENT = [1,0]
 
-  def possible_landing_squares(move, options=[], position=@position, moved=@moved)
-    if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
-      options << [position[0]+move[0], position[1]+move[1]]
-    end
-    if moved == false
-      options << [position[0]+(move[0]*2), position[1]+move[1]]
-    end
-    options
-  end
-
-  def attack_movement(team=@team)
-    return [[1, 1], [1, -1]]
-  end
-
-  def attackable_squares(moves, position=@position, options=[])
-    for move in moves
-      if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
-        options << [position[0]+move[0], position[1]+move[1]]
-      end
-    end
-    options
-  end
+  ATTACK_MOVEMENTS = [[1, 1], [1, -1]]
 
   def attack_move_finder(position=@position)
     targets = []
     board
-    moves = attack_movement()
-    attackableSquares = attackable_squares(moves)
+    moves = ATTACK_MOVEMENTS
+    attackableSquares = Movable.attackable_squares(moves, self)
     for square in attackableSquares
       if Movable.opponent?(self, board)
         targets << square
@@ -989,34 +977,13 @@ class WhitePawn < Board
 
   PIECE_MOVEMENT = [-1,0]
 
-  def possible_landing_squares(move, options=[], position=@position, moved=@moved)
-    if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
-      options << [position[0]+move[0], position[1]+move[1]]
-    end
-    if moved == false
-      options << [position[0]+(move[0]*2), position[1]+move[1]]
-    end
-    options
-  end
-
-  def attack_movement(team=@team)
-    return [[-1, 1], [-1,-1]]
-  end
-
-  def attackable_squares(moves, position=@position, options=[])
-    for move in moves
-      if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
-        options << [position[0]+move[0], position[1]+move[1]]
-      end
-    end
-    options
-  end
+  ATTACK_MOVEMENTS = [[-1, 1], [-1,-1]]
 
   def attack_move_finder(position=@position)
     targets = []
     board
-    moves = attack_movement()
-    attackableSquares = attackable_squares(moves)
+    moves = ATTACK_MOVEMENTS
+    attackableSquares = Movable.attackable_squares(moves, self)
     for square in attackableSquares
       if Movable.opponent?(self, board)
         targets << square
@@ -1027,7 +994,6 @@ class WhitePawn < Board
 
   def move_finder(position=@position)
     @moves = []
-    # binding.pry
     board
     pieceMoves = PIECE_MOVEMENT
     possibleDestinations = Movable.possible_landing_squares(self.class, self)
