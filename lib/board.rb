@@ -5,6 +5,9 @@ module Movable
   def self.possible_landing_squares(piecetype, piece, options=[])
     position = piece.position
     moves = piecetype::PIECE_MOVEMENT
+    if piece.type == "Pawn" && piece.moved == false
+      moves << [moves[0][0]*2, moves[0][1]]
+    end
     if piecetype == Queen || piecetype == Rook || piecetype == Bishop
         for move in moves
           for i in (1..7)
@@ -22,6 +25,7 @@ module Movable
             options << [position[0]+move[0], position[1]+move[1]]
           end
         end
+
     end
     options
   end
@@ -533,14 +537,37 @@ class King < Board
 
   PIECE_MOVEMENT =  [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,-1], [0,1], [0,-1]]
 
+  # def attack_move_finder(position=@position)
+  #   targets = []
+  #   board
+  #   moves = PIECE_MOVEMENT
+  #   attackableSquares = Movable.possible_landing_squares(self.class, self)
+  #   for square in attackableSquares
+  #     if Movable.opponent?(self, board)
+  #       targets << square
+  #     end
+  #   end
+  #   targets
+  # end
   def attack_move_finder(position=@position)
     targets = []
     board
-    moves = PIECE_MOVEMENT
-    attackableSquares = Movable.possible_landing_squares(self.class, self)
-    for square in attackableSquares
-      if Movable.opponent?(self, board)
-        targets << square
+    movesList = PIECE_MOVEMENT
+    for move in movesList
+      loc = position.clone
+      currentSquare = loc
+      (currentSquare[0] + move[0]).between?(0,7) ? currentSquare[0] = currentSquare[0] + move[0] : next
+      (currentSquare[1] + move[1]).between?(0,7) ? currentSquare[1] = currentSquare[1] + move[1] : next
+      while board[currentSquare[0]][currentSquare[1]] == "X" && (currentSquare[0]+move[0]).between?(0,7) && (currentSquare[1]+move[1]).between?(0,7)
+        currentSquare[0] = currentSquare[0] + move[0]
+        currentSquare[1] = currentSquare[1] + move[1]
+      end
+      if board[currentSquare[0]][currentSquare[1]] == "X"
+        next
+    elsif Movable.opponent?(self, board)
+        targets << currentSquare
+      else
+        next
       end
     end
     targets
@@ -666,7 +693,6 @@ class Queen < Board
     board
     movesList = PIECE_MOVEMENT
     for move in movesList
-        # binding.pry
       loc = position.clone
       currentSquare = loc
       (currentSquare[0] + move[0]).between?(0,7) ? currentSquare[0] = currentSquare[0] + move[0] : next
@@ -703,7 +729,7 @@ class Queen < Board
         @moves << destination
       end
     end
-    targets = attack_move_finder(@position)
+    targets = attack_move_finder(position=@position)
     @moves = @moves + targets
   end
 end
@@ -916,7 +942,7 @@ class BlackPawn < Board
     @@board
   end
 
-  PIECE_MOVEMENT = [1,0]
+  PIECE_MOVEMENT = [[1,0]]
 
   ATTACK_MOVEMENTS = [[1, 1], [1, -1]]
 
@@ -975,7 +1001,7 @@ class WhitePawn < Board
     @@board
   end
 
-  PIECE_MOVEMENT = [-1,0]
+  PIECE_MOVEMENT = [[-1,0]]
 
   ATTACK_MOVEMENTS = [[-1, 1], [-1,-1]]
 
