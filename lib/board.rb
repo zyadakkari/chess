@@ -1,13 +1,27 @@
 # require_relative './king.rb'
+require 'pry-byebug'
 
 module Movable
-  def possible_landing_squares(piece, options=[])
+  def Movable.possible_landing_squares(piecetype, piece, options=[])
     position = piece.position
-    moves = piece.PIECE_MOVEMENT
-    for move in moves
-      if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
-        options << [position[0]+move[0], position[1]+move[1]]
-      end
+    moves = piecetype::PIECE_MOVEMENT
+    if piecetype == Queen || piecetype == Rook || piecetype == Bishop
+        for move in moves
+          for i in (1..7)
+            tempvar = []
+            tempvar[0] = move[0] * i
+            tempvar[1] = move[1] * i
+            if (position[0]+tempvar[0]).between?(0,7) && (position[1]+tempvar[1]).between?(0,7)
+              options << [position[0]+tempvar[0], position[1]+tempvar[1]]
+            end
+          end
+        end
+    else
+        for move in moves
+          if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
+            options << [position[0]+move[0], position[1]+move[1]]
+          end
+        end
     end
     options
   end
@@ -133,6 +147,8 @@ class Game
 end
 
 class Board < Game
+
+  include Movable
 
   attr_accessor :board, :blackKing, :blackQueen, :blackRook1, :blackRook2,
   :blackKnight1, :blackKnight2, :blackBishop1, :blackBishop2, :blackPawn1,
@@ -442,6 +458,8 @@ end
 
 class King < Board
 
+  include Movable
+
   attr_reader :team, :symbol, :type, :pinned
   attr_accessor :status, :moves, :moved, :position
 
@@ -466,15 +484,6 @@ class King < Board
 
   PIECE_MOVEMENT =  [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,-1], [0,1], [0,-1]]
 
-  def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
-    for move in moves
-      if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
-        options << [position[0]+move[0], position[1]+move[1]]
-      end
-    end
-    options
-  end
-
   def opponent?(square, team=@team)
     opposingPiece = board[square[0]][square[1]]
     if opposingPiece != "X" && opposingPiece.team != team
@@ -486,7 +495,7 @@ class King < Board
     targets = []
     board
     moves = PIECE_MOVEMENT
-    attackableSquares = possible_landing_squares(moves)
+    attackableSquares = Movable.possible_landing_squares(self.class, self)
     for square in attackableSquares
       if opponent?(square)
         targets << square
@@ -572,7 +581,7 @@ class King < Board
     @moves = []
     board
     moves = PIECE_MOVEMENT
-    possibleDestinations = possible_landing_squares(moves)
+    possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
       obstructed = false
       if board[destination[0]][destination[1]] != "X"
@@ -617,23 +626,7 @@ class Queen < Board
     @@pieces
   end
 
-  def piece_movement()
-    return [[1,1], [1,-1], [-1,1], [-1,-1], [1,0], [-1,0], [0,1], [0,-1]]
-  end
-
-  def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
-    for move in moves
-      for i in (1..7)
-        tempvar = []
-        tempvar[0] = move[0] * i
-        tempvar[1] = move[1] * i
-        if (position[0]+tempvar[0]).between?(0,7) && (position[1]+tempvar[1]).between?(0,7)
-          options << [position[0]+tempvar[0], position[1]+tempvar[1]]
-        end
-      end
-    end
-    options
-  end
+  PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1], [1,0], [-1,0], [0,1], [0,-1]]
 
   def route_finder(position=@position, route=[], destination)
     curSq = position
@@ -668,7 +661,7 @@ class Queen < Board
   def attack_move_finder(position)
     targets = []
     board
-    movesList = piece_movement()
+    movesList = PIECE_MOVEMENT
     for move in movesList
         # binding.pry
       loc = position.clone
@@ -693,8 +686,8 @@ class Queen < Board
   def move_finder(position=@position)
     @moves = []
     board
-    piecemoves = piece_movement()
-    possibleDestinations = possible_landing_squares(piecemoves)
+    piecemoves = PIECE_MOVEMENT
+    possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
       route = route_finder(destination)
       obstructed = false
@@ -731,23 +724,7 @@ class Rook < Board
     @@board
   end
 
-  def piece_movement()
-    return [[1,0], [-1,0], [0,1], [0,-1]]
-  end
-
-  def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
-    for move in moves
-      for i in (1..7)
-        tempvar = []
-        tempvar[0] = move[0] * i
-        tempvar[1] = move[1] * i
-        if (position[0]+tempvar[0]).between?(0,7) && (position[1]+tempvar[1]).between?(0,7)
-          options << [position[0]+tempvar[0], position[1]+tempvar[1]]
-        end
-      end
-    end
-    options
-  end
+  PIECE_MOVEMENT = [[1,0], [-1,0], [0,1], [0,-1]]
 
   def route_finder(position=@position, route=[], destination)
     curSq = position
@@ -782,7 +759,7 @@ class Rook < Board
   def attack_move_finder(position)
     targets = []
     board
-    movesList = piece_movement()
+    movesList = PIECE_MOVEMENT
     for move in movesList
         # binding.pry
       loc = position.clone
@@ -807,8 +784,8 @@ class Rook < Board
   def move_finder(position=@position)
     @moves = []
     board
-    piecemoves = piece_movement()
-    possibleDestinations = possible_landing_squares(piecemoves)
+    piecemoves = PIECE_MOVEMENT
+    possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
       route = route_finder(destination)
       obstructed = false
@@ -845,23 +822,7 @@ class Bishop < Board
     @@board
   end
 
-  def piece_movement()
-    return [[1,1], [1,-1], [-1,1], [-1,-1]]
-  end
-
-  def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
-    for move in moves
-      for i in (1..7)
-        tempvar = []
-        tempvar[0] = move[0] * i
-        tempvar[1] = move[1] * i
-        if (position[0]+tempvar[0]).between?(0,7) && (position[1]+tempvar[1]).between?(0,7)
-          options << [position[0]+tempvar[0], position[1]+tempvar[1]]
-        end
-      end
-    end
-    options
-  end
+  PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1]]
 
   def route_finder(position=@position, route=[], destination)
 # binding.pry
@@ -885,7 +846,7 @@ class Bishop < Board
   def attack_move_finder(position)
     targets = []
     board
-    movesList = piece_movement()
+    movesList = PIECE_MOVEMENT
     for move in movesList
         # binding.pry
       loc = position.clone
@@ -910,8 +871,8 @@ class Bishop < Board
   def move_finder(position=@position)
     @moves = []
     board
-    piecemoves = piece_movement()
-    possibleDestinations = possible_landing_squares(piecemoves)
+    piecemoves = PIECE_MOVEMENT
+    possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
       route = route_finder(destination)
       obstructed = false
@@ -948,18 +909,7 @@ class Knight < Board
     @@board
   end
 
-  def piece_movement()
-    return [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [-1,2], [1,-2], [-1,-2]]
-  end
-
-  def possible_landing_squares(moves, options=[], position=@position, moved=@moved)
-    for move in moves
-      if (position[0]+move[0]).between?(0,7) && (position[1]+move[1]).between?(0,7)
-        options << [position[0]+move[0], position[1]+move[1]]
-      end
-    end
-    options
-  end
+  PIECE_MOVEMENT = [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [-1,2], [1,-2], [-1,-2]]
 
   def opponent?(square, team=@team)
     opposingPiece = board[square[0]][square[1]]
@@ -971,8 +921,8 @@ class Knight < Board
   def attack_move_finder(position=@position)
     targets = []
     board
-    moves = piece_movement()
-    attackableSquares = possible_landing_squares(moves)
+    moves = PIECE_MOVEMENT
+    attackableSquares = Movable.possible_landing_squares(self.class, self)
     for square in attackableSquares
       if opponent?(square)
         targets << square
@@ -984,8 +934,8 @@ class Knight < Board
   def move_finder(position=@position)
     @moves = []
     board
-    moves = piece_movement()
-    possibleDestinations = possible_landing_squares(moves)
+    moves = PIECE_MOVEMENT
+    possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
       obstructed = false
       if board[destination[0]][destination[1]] != "X"
