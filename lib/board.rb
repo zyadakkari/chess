@@ -2,7 +2,7 @@
 require 'pry-byebug'
 
 module Movable
-  def Movable.possible_landing_squares(piecetype, piece, options=[])
+  def self.possible_landing_squares(piecetype, piece, options=[])
     position = piece.position
     moves = piecetype::PIECE_MOVEMENT
     if piecetype == Queen || piecetype == Rook || piecetype == Bishop
@@ -26,11 +26,44 @@ module Movable
     options
   end
 
-  def Movable.opponent?(piece, board)
+  def self.opponent?(piece, board)
     opposingPiece = board[piece.position[0]][piece.position[1]]
     if opposingPiece != "X" && opposingPiece.team != piece.team
       return true
     end
+  end
+
+  # method only used by king to stop it moving into check
+  def self.illegal_moves(piece, otherpieces, opponentMoves=[])
+    for char in otherpieces
+      if char.team != piece.team && char.status == "Active"
+        char.moves.each { |move| opponentMoves << move }
+      end
+    end
+    illegalMoves = opponentMoves & piece.moves
+  end
+
+  def self.route_finder(piece, destination, path=[])
+    curSq = piece.position
+    move = []
+    if destination[0]-curSq[0] > 0
+      move[0] = 1
+    elsif destination[0]-curSq[0] < 0
+      move[0] = -1
+    else
+      move[0] = 0
+    end
+    if destination[1]-curSq[1] > 0
+      move[1] = 1
+    elsif destination[1]-curSq[1] < 0
+      move[1] = -1
+    else
+      move[1] = 0
+    end
+    until path.include?(destination)
+      path << curSq = [curSq[0]+move[0], curSq[1]+move[1]]
+    end
+    return path
   end
 
 end
@@ -284,7 +317,7 @@ class Board < Game
   def block_check_escape(team, checkers, escapes=[], king)
     for checker in checkers
       if checker.type == "Bishop" || checker.type == "Queen" || checker.type == "Rook"
-        route = checker.route_finder(king.position)
+        route = Movable.route_finder(checker, king.position)
         route = route - [king.position]
         escapes << route
       end
@@ -504,16 +537,6 @@ class King < Board
     targets
   end
 
-  def illegal_moves(moves, opponentMoves=[])
-    pieces
-    for char in pieces
-      if char.team != @team && char.status == "Active"
-        char.moves.each { |move| opponentMoves << move }
-      end
-    end
-    illegalMoves = opponentMoves & @moves
-  end
-
   def king_side_castle(position=@position)
     board()
     pieces()
@@ -580,6 +603,7 @@ class King < Board
   def move_finder(position=@position)
     @moves = []
     board
+    pieces
     moves = PIECE_MOVEMENT
     possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
@@ -593,7 +617,7 @@ class King < Board
     end
     targets = attack_move_finder()
     @moves = @moves + targets
-    illegalMoves = illegal_moves(@moves)
+    illegalMoves = Movable.illegal_moves(self, pieces)
     @moves = @moves - illegalMoves
     king_side_castle()
     queen_side_castle()
@@ -628,29 +652,6 @@ class Queen < Board
 
   PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1], [1,0], [-1,0], [0,1], [0,-1]]
 
-  def route_finder(position=@position, route=[], destination)
-    curSq = position
-    move = []
-    if destination[0]-curSq[0] > 0
-      move[0] = 1
-    elsif destination[0]-curSq[0] < 0
-      move[0] = -1
-    else
-      move[0] = 0
-    end
-    if destination[1]-curSq[1] > 0
-      move[1] = 1
-    elsif destination[1]-curSq[1] < 0
-      move[1] = -1
-    else
-      move[1] = 0
-    end
-    until route.include?(destination)
-      route << curSq = [curSq[0]+move[0], curSq[1]+move[1]]
-    end
-    route
-  end
-
   def attack_move_finder(position)
     targets = []
     board
@@ -682,7 +683,7 @@ class Queen < Board
     piecemoves = PIECE_MOVEMENT
     possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
-      route = route_finder(destination)
+      route = Movable.route_finder(self, destination)
       obstructed = false
       for square in route
         if board[square[0]][square[1]] != "X"
@@ -719,29 +720,6 @@ class Rook < Board
 
   PIECE_MOVEMENT = [[1,0], [-1,0], [0,1], [0,-1]]
 
-  def route_finder(position=@position, route=[], destination)
-    curSq = position
-    move = []
-    if destination[0]-curSq[0] > 0
-      move[0] = 1
-    elsif destination[0]-curSq[0] < 0
-      move[0] = -1
-    else
-      move[0] = 0
-    end
-    if destination[1]-curSq[1] > 0
-      move[1] = 1
-    elsif destination[1]-curSq[1] < 0
-      move[1] = -1
-    else
-      move[1] = 0
-    end
-    until route.include?(destination)
-      route << curSq = [curSq[0]+move[0], curSq[1]+move[1]]
-    end
-    route
-  end
-
   def attack_move_finder(position)
     targets = []
     board
@@ -773,7 +751,7 @@ class Rook < Board
     piecemoves = PIECE_MOVEMENT
     possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
-      route = route_finder(destination)
+      route = Movable.route_finder(self, destination)
       obstructed = false
       for square in route
         if board[square[0]][square[1]] != "X"
@@ -810,18 +788,6 @@ class Bishop < Board
 
   PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1]]
 
-  def route_finder(position=@position, route=[], destination)
-# binding.pry
-    curSq = position
-    move = []
-    destination[0]-curSq[0] > 0 ? move[0] = 1 : move[0] = -1
-    destination[1]-curSq[1] > 0 ? move[1] = 1 : move[1] = -1
-    until route.include?(destination)
-      route << curSq = [curSq[0]+move[0], curSq[1]+move[1]]
-    end
-    route
-  end
-
   def attack_move_finder(position)
     targets = []
     board
@@ -853,7 +819,7 @@ class Bishop < Board
     piecemoves = PIECE_MOVEMENT
     possibleDestinations = Movable.possible_landing_squares(self.class, self)
     for destination in possibleDestinations
-      route = route_finder(destination)
+      route = Movable.route_finder(self, destination)
       obstructed = false
       for square in route
         if board[square[0]][square[1]] != "X"
@@ -955,14 +921,6 @@ class Pawn < Board
     options
   end
 
-  def route_finder(position=@position, route=[], destination, move)
-    curSq = position
-    until route.include?(destination)
-      route << curSq = [curSq[0]+move[0], curSq[1]+move[1]]
-    end
-    route
-  end
-
   def attack_movement(team=@team)
     return team == "Black" ? [[1, 1], [1, -1]] : [[-1, 1], [-1,-1]]
   end
@@ -996,7 +954,7 @@ class Pawn < Board
     pieceMoves = piece_movement
     possibleDestinations = possible_landing_squares(pieceMoves)
     for destination in possibleDestinations
-      route = route_finder(destination, pieceMoves)
+      route = Movable.route_finder(self, destination)
       obstructed = false
       for square in route
         if board[square[0]][square[1]] != "X"
