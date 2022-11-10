@@ -30,8 +30,8 @@ module Movable
     options
   end
 
-  def self.opponent?(piece, board)
-    opposingPiece = board[piece.position[0]][piece.position[1]]
+  def self.opponent?(piece, square, board)
+    opposingPiece = board[square[0]][square[1]]
     if opposingPiece != "X" && opposingPiece.team != piece.team
       return true
     end
@@ -265,7 +265,7 @@ class Board < Game
     recalculate_all_moves()
     for char in @@pieces
       if char.status == "Active" && char.type != "King"
-        pinned(char)
+        # pinned(char)
       end
     end
   end
@@ -361,77 +361,77 @@ class Board < Game
     end
   end
 
-  def pinned(chesspiece, pinners=[], move=[])
-    pinned = false
-    #possible pinners
-    for char in @@pieces
-      if char.team != @team && char.status == "Active"
-        if char.type == "Queen" || char.type == "Bishop" || char.type == "Rook"
-          pinners << char
-        end
-      end
-    end
-    # actual pinners & their move direction
-    for piece in pinners
-      if piece.moves.include?(chesspiece.position)
-        if piece.position[0] - chesspiece.position[0] < 0
-          move[0] = 1
-      elsif piece.position[0] - chesspiece.position[0] > 0
-          move[0] = -1
-        else
-          move[0] = 0
-        end
-        if piece.position[1] - chesspiece.position[1] < 0
-          move[1] = 1
-      elsif piece.position[1] - chesspiece.position[1] > 0
-          move[1] = -1
-      else
-          move[1] = 0
-      end
-        positionToCheck = chesspiece.position.clone
-        positionToCheck[0] = positionToCheck[0]+move[0]
-        positionToCheck[1] = positionToCheck[1]+move[1]
-        until board[positionToCheck[0]][positionToCheck[1]] != "X" || !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
-          positionToCheck[0] = positionToCheck[0]+move[0]
-          positionToCheck[1] = positionToCheck[1]+move[1]
-        end
-        positionToCheck
-        if !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
-          next
-      elsif @@board[positionToCheck[0]][positionToCheck[1]].type == "King"
-# binding.pry
-            @pinned = true
-            # check legal forward moves
-            move[0] = move[0]*-1
-            move[1] = move[1]*-1
-            positionToCheck = chesspiece.position.clone
-            openSquares = []
-            positionToCheck[0] = positionToCheck[0]+move[0]
-            positionToCheck[1] = positionToCheck[1]+move[1]
-            openSquares << positionToCheck.clone
-            until @@board[positionToCheck[0]][positionToCheck[1]] != "X"
-              openSquares << positionToCheck.clone
-              positionToCheck[0] = positionToCheck[0]+move[0]
-              positionToCheck[1] = positionToCheck[1]+move[1]
-            end
-            openSquares << positionToCheck
-            # check legal backward moves
-            positionToCheck = chesspiece.position.clone
-            move[0] = move[0]*-1
-            move[1] = move[1]*-1
-            positionToCheck[0] = positionToCheck[0]+move[0]
-            positionToCheck[1] = positionToCheck[1]+move[1]
-            while board[positionToCheck[0]][positionToCheck[1]] == "X"
-              openSquares << positionToCheck.clone
-              positionToCheck[0] = positionToCheck[0]+move[0]
-              positionToCheck[1] = positionToCheck[1]+move[1]
-            end
-            chesspiece.moves = []
-            openSquares.each { |move| chesspiece.moves << move }
-        end
-      end
-    end
-  end
+#   def pinned(chesspiece, pinners=[], move=[])
+#     pinned = false
+#     #possible pinners
+#     for char in @@pieces
+#       if char.team != @team && char.status == "Active"
+#         if char.type == "Queen" || char.type == "Bishop" || char.type == "Rook"
+#           pinners << char
+#         end
+#       end
+#     end
+#     # actual pinners & their move direction
+#     for piece in pinners
+#       if piece.moves.include?(chesspiece.position)
+#         if piece.position[0] - chesspiece.position[0] < 0
+#           move[0] = 1
+#       elsif piece.position[0] - chesspiece.position[0] > 0
+#           move[0] = -1
+#         else
+#           move[0] = 0
+#         end
+#         if piece.position[1] - chesspiece.position[1] < 0
+#           move[1] = 1
+#       elsif piece.position[1] - chesspiece.position[1] > 0
+#           move[1] = -1
+#       else
+#           move[1] = 0
+#       end
+#         positionToCheck = chesspiece.position.clone
+#         positionToCheck[0] = positionToCheck[0]+move[0]
+#         positionToCheck[1] = positionToCheck[1]+move[1]
+#         until board[positionToCheck[0]][positionToCheck[1]] != "X" || !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
+#           positionToCheck[0] = positionToCheck[0]+move[0]
+#           positionToCheck[1] = positionToCheck[1]+move[1]
+#         end
+#         positionToCheck
+#         if !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
+#           next
+#       elsif @@board[positionToCheck[0]][positionToCheck[1]].type == "King"
+# # binding.pry
+#             @pinned = true
+#             # check legal forward moves
+#             move[0] = move[0]*-1
+#             move[1] = move[1]*-1
+#             positionToCheck = chesspiece.position.clone
+#             openSquares = []
+#             positionToCheck[0] = positionToCheck[0]+move[0]
+#             positionToCheck[1] = positionToCheck[1]+move[1]
+#             openSquares << positionToCheck.clone
+#             until @@board[positionToCheck[0]][positionToCheck[1]] != "X"
+#               openSquares << positionToCheck.clone
+#               positionToCheck[0] = positionToCheck[0]+move[0]
+#               positionToCheck[1] = positionToCheck[1]+move[1]
+#             end
+#             openSquares << positionToCheck
+#             # check legal backward moves
+#             positionToCheck = chesspiece.position.clone
+#             move[0] = move[0]*-1
+#             move[1] = move[1]*-1
+#             positionToCheck[0] = positionToCheck[0]+move[0]
+#             positionToCheck[1] = positionToCheck[1]+move[1]
+#             while board[positionToCheck[0]][positionToCheck[1]] == "X"
+#               openSquares << positionToCheck.clone
+#               positionToCheck[0] = positionToCheck[0]+move[0]
+#               positionToCheck[1] = positionToCheck[1]+move[1]
+#             end
+#             chesspiece.moves = []
+#             openSquares.each { |move| chesspiece.moves << move }
+#         end
+#       end
+#     end
+#   end
 
   def king_maker(kings=[])
     kings << @whiteKing = King.new("White", "\♔", "King")
@@ -537,37 +537,13 @@ class King < Board
 
   PIECE_MOVEMENT =  [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,-1], [0,1], [0,-1]]
 
-  # def attack_move_finder(position=@position)
-  #   targets = []
-  #   board
-  #   moves = PIECE_MOVEMENT
-  #   attackableSquares = Movable.possible_landing_squares(self.class, self)
-  #   for square in attackableSquares
-  #     if Movable.opponent?(self, board)
-  #       targets << square
-  #     end
-  #   end
-  #   targets
-  # end
   def attack_move_finder(position=@position)
     targets = []
     board
-    movesList = PIECE_MOVEMENT
-    for move in movesList
-      loc = position.clone
-      currentSquare = loc
-      (currentSquare[0] + move[0]).between?(0,7) ? currentSquare[0] = currentSquare[0] + move[0] : next
-      (currentSquare[1] + move[1]).between?(0,7) ? currentSquare[1] = currentSquare[1] + move[1] : next
-      while board[currentSquare[0]][currentSquare[1]] == "X" && (currentSquare[0]+move[0]).between?(0,7) && (currentSquare[1]+move[1]).between?(0,7)
-        currentSquare[0] = currentSquare[0] + move[0]
-        currentSquare[1] = currentSquare[1] + move[1]
-      end
-      if board[currentSquare[0]][currentSquare[1]] == "X"
-        next
-    elsif Movable.opponent?(self, board)
-        targets << currentSquare
-      else
-        next
+    attackableSquares = Movable.possible_landing_squares(self.class, self)
+    for square in attackableSquares
+      if Movable.opponent?(self, square, board)
+        targets << square
       end
     end
     targets
@@ -688,25 +664,13 @@ class Queen < Board
 
   PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1], [1,0], [-1,0], [0,1], [0,-1]]
 
-  def attack_move_finder(position)
+  def attack_move_finder(position=@position)
     targets = []
     board
-    movesList = PIECE_MOVEMENT
-    for move in movesList
-      loc = position.clone
-      currentSquare = loc
-      (currentSquare[0] + move[0]).between?(0,7) ? currentSquare[0] = currentSquare[0] + move[0] : next
-      (currentSquare[1] + move[1]).between?(0,7) ? currentSquare[1] = currentSquare[1] + move[1] : next
-      while board[currentSquare[0]][currentSquare[1]] == "X" && (currentSquare[0]+move[0]).between?(0,7) && (currentSquare[1]+move[1]).between?(0,7)
-        currentSquare[0] = currentSquare[0] + move[0]
-        currentSquare[1] = currentSquare[1] + move[1]
-      end
-      if board[currentSquare[0]][currentSquare[1]] == "X"
-        next
-    elsif Movable.opponent?(self, board)
-        targets << currentSquare
-      else
-        next
+    attackableSquares = Movable.possible_landing_squares(self.class, self)
+    for square in attackableSquares
+      if Movable.opponent?(self, square, board)
+        targets << square
       end
     end
     targets
@@ -755,26 +719,13 @@ class Rook < Board
 
   PIECE_MOVEMENT = [[1,0], [-1,0], [0,1], [0,-1]]
 
-  def attack_move_finder(position)
+  def attack_move_finder(position=@position)
     targets = []
     board
-    movesList = PIECE_MOVEMENT
-    for move in movesList
-        # binding.pry
-      loc = position.clone
-      currentSquare = loc
-      (currentSquare[0] + move[0]).between?(0,7) ? currentSquare[0] = currentSquare[0] + move[0] : next
-      (currentSquare[1] + move[1]).between?(0,7) ? currentSquare[1] = currentSquare[1] + move[1] : next
-      while board[currentSquare[0]][currentSquare[1]] == "X" && (currentSquare[0]+move[0]).between?(0,7) && (currentSquare[1]+move[1]).between?(0,7)
-        currentSquare[0] = currentSquare[0] + move[0]
-        currentSquare[1] = currentSquare[1] + move[1]
-      end
-      if board[currentSquare[0]][currentSquare[1]] == "X"
-        next
-    elsif Movable.opponent?(self, board)
-        targets << currentSquare
-      else
-        next
+    attackableSquares = Movable.possible_landing_squares(self.class, self)
+    for square in attackableSquares
+      if Movable.opponent?(self, square, board)
+        targets << square
       end
     end
     targets
@@ -823,26 +774,13 @@ class Bishop < Board
 
   PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1]]
 
-  def attack_move_finder(position)
+  def attack_move_finder(position=@position)
     targets = []
     board
-    movesList = PIECE_MOVEMENT
-    for move in movesList
-        # binding.pry
-      loc = position.clone
-      currentSquare = loc
-      (currentSquare[0] + move[0]).between?(0,7) ? currentSquare[0] = currentSquare[0] + move[0] : next
-      (currentSquare[1] + move[1]).between?(0,7) ? currentSquare[1] = currentSquare[1] + move[1] : next
-      while board[currentSquare[0]][currentSquare[1]] == "X" && (currentSquare[0]+move[0]).between?(0,7) && (currentSquare[1]+move[1]).between?(0,7)
-        currentSquare[0] = currentSquare[0] + move[0]
-        currentSquare[1] = currentSquare[1] + move[1]
-      end
-      if board[currentSquare[0]][currentSquare[1]] == "X"
-        next
-    elsif Movable.opponent?(self, board)
-        targets << currentSquare
-      else
-        next
+    attackableSquares = Movable.possible_landing_squares(self.class, self)
+    for square in attackableSquares
+      if Movable.opponent?(self, square, board)
+        targets << square
       end
     end
     targets
@@ -894,10 +832,9 @@ class Knight < Board
   def attack_move_finder(position=@position)
     targets = []
     board
-    moves = PIECE_MOVEMENT
     attackableSquares = Movable.possible_landing_squares(self.class, self)
     for square in attackableSquares
-      if Movable.opponent?(self, board)
+      if Movable.opponent?(self, square, board)
         targets << square
       end
     end
@@ -952,7 +889,7 @@ class BlackPawn < Board
     moves = ATTACK_MOVEMENTS
     attackableSquares = Movable.attackable_squares(moves, self)
     for square in attackableSquares
-      if Movable.opponent?(self, board)
+      if Movable.opponent?(self, square, board)
         targets << square
       end
     end
@@ -1011,7 +948,7 @@ class WhitePawn < Board
     moves = ATTACK_MOVEMENTS
     attackableSquares = Movable.attackable_squares(moves, self)
     for square in attackableSquares
-      if Movable.opponent?(self, board)
+      if Movable.opponent?(self, square, board)
         targets << square
       end
     end
