@@ -79,6 +79,17 @@ module Movable
     options
   end
 
+  def self.attack_move_finder(piece, board)
+    targets = []
+    attackableSquares = Movable.possible_landing_squares(piece.class, piece)
+    for square in attackableSquares
+      if Movable.opponent?(piece, square, board)
+        targets << square
+      end
+    end
+    targets
+  end
+
 end
 
 class Game
@@ -537,17 +548,6 @@ class King < Board
 
   PIECE_MOVEMENT =  [[1,0], [1,1], [1,-1], [-1,0], [-1,1], [-1,-1], [0,1], [0,-1]]
 
-  def attack_move_finder(position=@position)
-    targets = []
-    board
-    attackableSquares = Movable.possible_landing_squares(self.class, self)
-    for square in attackableSquares
-      if Movable.opponent?(self, square, board)
-        targets << square
-      end
-    end
-    targets
-  end
 
   def king_side_castle(position=@position)
     board()
@@ -627,7 +627,7 @@ class King < Board
         @moves << destination
       end
     end
-    targets = attack_move_finder()
+    targets = Movable.attack_move_finder(self, board)
     @moves = @moves + targets
     illegalMoves = Movable.illegal_moves(self, pieces)
     @moves = @moves - illegalMoves
@@ -664,18 +664,6 @@ class Queen < Board
 
   PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1], [1,0], [-1,0], [0,1], [0,-1]]
 
-  def attack_move_finder(position=@position)
-    targets = []
-    board
-    attackableSquares = Movable.possible_landing_squares(self.class, self)
-    for square in attackableSquares
-      if Movable.opponent?(self, square, board)
-        targets << square
-      end
-    end
-    targets
-  end
-
   def move_finder(position=@position)
     @moves = []
     board
@@ -693,7 +681,7 @@ class Queen < Board
         @moves << destination
       end
     end
-    targets = attack_move_finder(position=@position)
+    targets = Movable.attack_move_finder(self, board)
     @moves = @moves + targets
   end
 end
@@ -719,18 +707,6 @@ class Rook < Board
 
   PIECE_MOVEMENT = [[1,0], [-1,0], [0,1], [0,-1]]
 
-  def attack_move_finder(position=@position)
-    targets = []
-    board
-    attackableSquares = Movable.possible_landing_squares(self.class, self)
-    for square in attackableSquares
-      if Movable.opponent?(self, square, board)
-        targets << square
-      end
-    end
-    targets
-  end
-
   def move_finder(position=@position)
     @moves = []
     board
@@ -748,7 +724,7 @@ class Rook < Board
         @moves << destination
       end
     end
-    targets = attack_move_finder(@position)
+    targets = Movable.attack_move_finder(self, board)
     @moves = @moves + targets
   end
 end
@@ -774,18 +750,6 @@ class Bishop < Board
 
   PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1]]
 
-  def attack_move_finder(position=@position)
-    targets = []
-    board
-    attackableSquares = Movable.possible_landing_squares(self.class, self)
-    for square in attackableSquares
-      if Movable.opponent?(self, square, board)
-        targets << square
-      end
-    end
-    targets
-  end
-
   def move_finder(position=@position)
     @moves = []
     board
@@ -803,7 +767,7 @@ class Bishop < Board
         @moves << destination
       end
     end
-    targets = attack_move_finder(@position)
+    targets = Movable.attack_move_finder(self, board)
     @moves = @moves + targets
   end
 end
@@ -829,18 +793,6 @@ class Knight < Board
 
   PIECE_MOVEMENT = [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [-1,2], [1,-2], [-1,-2]]
 
-  def attack_move_finder(position=@position)
-    targets = []
-    board
-    attackableSquares = Movable.possible_landing_squares(self.class, self)
-    for square in attackableSquares
-      if Movable.opponent?(self, square, board)
-        targets << square
-      end
-    end
-    targets
-  end
-
   def move_finder(position=@position)
     @moves = []
     board
@@ -855,7 +807,7 @@ class Knight < Board
         @moves << destination
       end
     end
-    targets = attack_move_finder()
+    targets = Movable.attack_move_finder(self, board)
     @moves = @moves + targets
   end
 end
