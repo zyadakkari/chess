@@ -2,13 +2,13 @@
 require 'pry-byebug'
 
 module Movable
-  def self.possible_landing_squares(piecetype, piece, options=[])
+  def self.possible_landing_squares(piece, options=[])
     position = piece.position
-    moves = piecetype::PIECE_MOVEMENT
-    if piece.type == "Pawn" && piece.moved == false
+    moves = piece.class::PIECE_MOVEMENT
+    if (piece.class == BlackPawn || piece.class == WhitePawn) && piece.moved == false
       moves << [moves[0][0]*2, moves[0][1]]
     end
-    if piecetype == Queen || piecetype == Rook || piecetype == Bishop
+    if piece.class == Queen || piece.class == Rook || piece.class == Bishop
         for move in moves
           for i in (1..7)
             tempvar = []
@@ -28,6 +28,8 @@ module Movable
 
     end
     options
+
+
   end
 
   def self.opponent?(piece, square, board)
@@ -70,7 +72,8 @@ module Movable
     return path
   end
 
-  def self.attackable_squares(moves, piece, options=[])
+  def self.attackable_squares(piece, options=[])
+    moves = piece.class::ATTACK_MOVEMENTS
     for move in moves
       if (piece.position[0]+move[0]).between?(0,7) && (piece.position[1]+move[1]).between?(0,7)
         options << [piece.position[0]+move[0], piece.position[1]+move[1]]
@@ -81,9 +84,13 @@ module Movable
 
   def self.attack_move_finder(piece, board)
     targets = []
-    attackableSquares = Movable.possible_landing_squares(piece.class, piece)
+    if piece.class == WhitePawn || piece.class == BlackPawn
+        attackableSquares = self.attackable_squares(piece)
+    else
+        attackableSquares = self.possible_landing_squares(piece)
+    end
     for square in attackableSquares
-      if Movable.opponent?(piece, square, board)
+      if self.opponent?(piece, square, board)
         targets << square
       end
     end
@@ -191,9 +198,9 @@ class Game
         while escaped == false
           @piece = piece_selector()
           move = move_selector()
-          if board[@piece[0]][@piece[1]].type == "King" && moveEscapes.include?(move)
+          if board[@piece[0]][@piece[1]].class == King && moveEscapes.include?(move)
             escaped = true
-          elsif board[@piece[0]][@piece[1]].type != "King" && blockEscapes.include?(move)
+        elsif board[@piece[0]][@piece[1]].class != King && blockEscapes.include?(move)
             escaped = true
           elsif checkers.length == 1 && takeEscape == move
             escaped = true
@@ -272,13 +279,43 @@ class Board < Game
         attack(piece, move)
     end
     #to ensure new moves are calculating based on the new position
-    piece.move_finder
+    move_finder(piece)
     recalculate_all_moves()
     for char in @@pieces
-      if char.status == "Active" && char.type != "King"
+      if char.status == "Active" && char.class != King
         # pinned(char)
       end
     end
+  end
+
+  def move_finder(piece)
+    @moves = []
+    @@board
+    piecemoves = piece.class::PIECE_MOVEMENT
+    possibleDestinations = Movable.possible_landing_squares(piece)
+    for destination in possibleDestinations
+      obstructed = false
+      if piece.class != Knight
+        route = Movable.route_finder(piece, destination)
+        for square in route
+          if @@board[square[0]][square[1]] != "X"
+            obstructed = true
+          end
+        end
+        if obstructed == false
+          piece.moves << destination
+        end
+      else
+        if @@board[destination[0]][destination[1]] != "X"
+          obstructed = true
+        end
+        if obstructed == false
+          piece.moves << destination
+        end
+      end
+    end
+    targets = Movable.attack_move_finder(piece, @@board)
+    piece.moves = piece.moves + targets
   end
 
   def attack(piece, move)
@@ -291,7 +328,7 @@ class Board < Game
   end
 
   def castle_check(piece, move)
-    if piece.type == "King" && (move[1]+piece.position[1] == 6 || move[1]+piece.position[1] == 10)
+    if piece.class == King && (move[1]+piece.position[1] == 6 || move[1]+piece.position[1] == 10)
       return true
     end
   end
@@ -340,7 +377,7 @@ class Board < Game
 
   def block_check_escape(team, checkers, escapes=[], king)
     for checker in checkers
-      if checker.type == "Bishop" || checker.type == "Queen" || checker.type == "Rook"
+      if checker.class == Bishop || checker.class == Queen || checker.class == Rook
         route = Movable.route_finder(checker, king.position)
         route = route - [king.position]
         escapes << route
@@ -367,7 +404,7 @@ class Board < Game
   def recalculate_all_moves()
     for char in @@pieces
       if char.status == "Active"
-        char.move_finder()
+        move_finder(char)
       end
     end
   end
@@ -377,7 +414,7 @@ class Board < Game
 #     #possible pinners
 #     for char in @@pieces
 #       if char.team != @team && char.status == "Active"
-#         if char.type == "Queen" || char.type == "Bishop" || char.type == "Rook"
+#         if char.class == Queen || char.class == Bishop || char.class == Rook
 #           pinners << char
 #         end
 #       end
@@ -409,7 +446,7 @@ class Board < Game
 #         positionToCheck
 #         if !positionToCheck[0].between?(0,7) || !positionToCheck[1].between?(0,7)
 #           next
-#       elsif @@board[positionToCheck[0]][positionToCheck[1]].type == "King"
+#       elsif @@board[positionToCheck[0]][positionToCheck[1]].class == King
 # # binding.pry
 #             @pinned = true
 #             # check legal forward moves
@@ -445,8 +482,8 @@ class Board < Game
 #   end
 
   def king_maker(kings=[])
-    kings << @whiteKing = King.new("White", "\♔", "King")
-    kings << @blackKing = King.new("Black", "\♚", "King")
+    kings << @whiteKing = King.new("White", "\♔")
+    kings << @blackKing = King.new("Black", "\♚")
     for king in kings
       edit_board(king.position, king)
       @@pieces << king
@@ -454,8 +491,8 @@ class Board < Game
   end
 
   def queen_maker(queens=[])
-    queens << @whiteQueen = Queen.new("White", "\♕", "Queen")
-    queens << @blackQueen = Queen.new("Black", "\♛", "Queen")
+    queens << @whiteQueen = Queen.new("White", "\♕")
+    queens << @blackQueen = Queen.new("Black", "\♛")
     for queen in queens
       edit_board(queen.position, queen)
       @@pieces << queen
@@ -463,10 +500,10 @@ class Board < Game
   end
 
   def rook_maker(rooks=[])
-    rooks << @whiteRook1 = Rook.new("White", "\♖", [7,0], "Rook")
-    rooks << @whiteRook2 = Rook.new("White", "\♖", [7,7], "Rook")
-    rooks << @blackRook1 = Rook.new("Black", "\♜", [0,0], "Rook")
-    rooks << @blackRook2 = Rook.new("Black", "\♜", [0,7], "Rook")
+    rooks << @whiteRook1 = Rook.new("White", "\♖", [7,0])
+    rooks << @whiteRook2 = Rook.new("White", "\♖", [7,7])
+    rooks << @blackRook1 = Rook.new("Black", "\♜", [0,0])
+    rooks << @blackRook2 = Rook.new("Black", "\♜", [0,7])
     for rook in rooks
       edit_board(rook.position, rook)
       @@pieces << rook
@@ -474,10 +511,10 @@ class Board < Game
   end
 
   def bishop_maker(bishops=[])
-    bishops << @whiteBishop1 = Bishop.new("White", "\♗", [7,2], "Bishop")
-    bishops << @whiteBishop2 = Bishop.new("White", "\♗", [7,5], "Bishop")
-    bishops << @blackBishop1 = Bishop.new("Black", "\♝", [0,2], "Bishop")
-    bishops << @blackBishop2 = Bishop.new("Black", "\♝", [0,5], "Bishop")
+    bishops << @whiteBishop1 = Bishop.new("White", "\♗", [7,2])
+    bishops << @whiteBishop2 = Bishop.new("White", "\♗", [7,5])
+    bishops << @blackBishop1 = Bishop.new("Black", "\♝", [0,2])
+    bishops << @blackBishop2 = Bishop.new("Black", "\♝", [0,5])
     for bishop in bishops
       edit_board(bishop.position, bishop)
       @@pieces << bishop
@@ -485,10 +522,10 @@ class Board < Game
   end
 
   def knight_maker(knights=[])
-    knights << @whiteKnight1 = Knight.new("White", "\♘", [7,1], "Knight")
-    knights << @whiteKnight2 = Knight.new("White", "\♘", [7,6], "Knight")
-    knights << @blackKnight1 = Knight.new("Black", "\♞", [0,1], "Knight")
-    knights << @blackKnight2 = Knight.new("Black", "\♞", [0,6], "Knight")
+    knights << @whiteKnight1 = Knight.new("White", "\♘", [7,1])
+    knights << @whiteKnight2 = Knight.new("White", "\♘", [7,6])
+    knights << @blackKnight1 = Knight.new("Black", "\♞", [0,1])
+    knights << @blackKnight2 = Knight.new("Black", "\♞", [0,6])
     for knight in knights
       edit_board(knight.position, knight)
       @@pieces << knight
@@ -496,22 +533,22 @@ class Board < Game
   end
 
   def pawn_maker(pawns=[])
-    pawns << @whitePawn1 = WhitePawn.new("White", "\♙", [6,0], "Pawn")
-    pawns << @whitePawn2 = WhitePawn.new("White", "\♙", [6,1], "Pawn")
-    pawns << @whitePawn3 = WhitePawn.new("White", "\♙", [6,2], "Pawn")
-    pawns << @whitePawn4 = WhitePawn.new("White", "\♙", [6,3], "Pawn")
-    pawns << @whitePawn5 = WhitePawn.new("White", "\♙", [6,4], "Pawn")
-    pawns << @whitePawn6 = WhitePawn.new("White", "\♙", [6,5], "Pawn")
-    pawns << @whitePawn7 = WhitePawn.new("White", "\♙", [6,6], "Pawn")
-    pawns << @whitePawn8 = WhitePawn.new("White", "\♙", [6,7], "Pawn")
-    pawns << @blackPawn1 = BlackPawn.new("Black", "\♟", [1,0], "Pawn")
-    pawns << @blackPawn2 = BlackPawn.new("Black", "\♟", [1,1], "Pawn")
-    pawns << @blackPawn3 = BlackPawn.new("Black", "\♟", [1,2], "Pawn")
-    pawns << @blackPawn4 = BlackPawn.new("Black", "\♟", [1,3], "Pawn")
-    pawns << @blackPawn5 = BlackPawn.new("Black", "\♟", [1,4], "Pawn")
-    pawns << @blackPawn6 = BlackPawn.new("Black", "\♟", [1,5], "Pawn")
-    pawns << @blackPawn7 = BlackPawn.new("Black", "\♟", [1,6], "Pawn")
-    pawns << @blackPawn8 = BlackPawn.new("Black", "\♟", [1,7], "Pawn")
+    pawns << @whitePawn1 = WhitePawn.new("White", "\♙", [6,0])
+    pawns << @whitePawn2 = WhitePawn.new("White", "\♙", [6,1])
+    pawns << @whitePawn3 = WhitePawn.new("White", "\♙", [6,2])
+    pawns << @whitePawn4 = WhitePawn.new("White", "\♙", [6,3])
+    pawns << @whitePawn5 = WhitePawn.new("White", "\♙", [6,4])
+    pawns << @whitePawn6 = WhitePawn.new("White", "\♙", [6,5])
+    pawns << @whitePawn7 = WhitePawn.new("White", "\♙", [6,6])
+    pawns << @whitePawn8 = WhitePawn.new("White", "\♙", [6,7])
+    pawns << @blackPawn1 = BlackPawn.new("Black", "\♟", [1,0])
+    pawns << @blackPawn2 = BlackPawn.new("Black", "\♟", [1,1])
+    pawns << @blackPawn3 = BlackPawn.new("Black", "\♟", [1,2])
+    pawns << @blackPawn4 = BlackPawn.new("Black", "\♟", [1,3])
+    pawns << @blackPawn5 = BlackPawn.new("Black", "\♟", [1,4])
+    pawns << @blackPawn6 = BlackPawn.new("Black", "\♟", [1,5])
+    pawns << @blackPawn7 = BlackPawn.new("Black", "\♟", [1,6])
+    pawns << @blackPawn8 = BlackPawn.new("Black", "\♟", [1,7])
     for pawn in pawns
       edit_board(pawn.position, pawn)
       @@pieces << pawn
@@ -524,12 +561,11 @@ class King < Board
 
   include Movable
 
-  attr_reader :team, :symbol, :type, :pinned
+  attr_reader :team, :symbol, :pinned
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, type)
+  def initialize(team, symbol)
     @team = team
-    @type = type
     @symbol = symbol
     @status = "Active"
     @pinned = false
@@ -612,39 +648,15 @@ class King < Board
 
   end
 
-  def move_finder(position=@position)
-    @moves = []
-    board
-    pieces
-    moves = PIECE_MOVEMENT
-    possibleDestinations = Movable.possible_landing_squares(self.class, self)
-    for destination in possibleDestinations
-      obstructed = false
-      if board[destination[0]][destination[1]] != "X"
-          obstructed = true
-      end
-      if obstructed == false
-        @moves << destination
-      end
-    end
-    targets = Movable.attack_move_finder(self, board)
-    @moves = @moves + targets
-    illegalMoves = Movable.illegal_moves(self, pieces)
-    @moves = @moves - illegalMoves
-    king_side_castle()
-    queen_side_castle()
-    @moves
-  end
 
 end
 
 class Queen < Board
-  attr_reader :team, :symbol, :value, :type
+  attr_reader :team, :symbol, :value
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, type)
+  def initialize(team, symbol)
     @team = team
-    @type = type
     @symbol = symbol
     @status = "Active"
     @moves = []
@@ -664,35 +676,14 @@ class Queen < Board
 
   PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1], [1,0], [-1,0], [0,1], [0,-1]]
 
-  def move_finder(position=@position)
-    @moves = []
-    board
-    piecemoves = PIECE_MOVEMENT
-    possibleDestinations = Movable.possible_landing_squares(self.class, self)
-    for destination in possibleDestinations
-      route = Movable.route_finder(self, destination)
-      obstructed = false
-      for square in route
-        if board[square[0]][square[1]] != "X"
-          obstructed = true
-        end
-      end
-      if obstructed == false
-        @moves << destination
-      end
-    end
-    targets = Movable.attack_move_finder(self, board)
-    @moves = @moves + targets
-  end
 end
 
 class Rook < Board
-  attr_reader :team, :symbol, :value, :type
+  attr_reader :team, :symbol, :value
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, position, type)
+  def initialize(team, symbol, position)
     @team = team
-    @type = type
     @symbol = symbol
     @status = "Active"
     @moves = []
@@ -707,35 +698,14 @@ class Rook < Board
 
   PIECE_MOVEMENT = [[1,0], [-1,0], [0,1], [0,-1]]
 
-  def move_finder(position=@position)
-    @moves = []
-    board
-    piecemoves = PIECE_MOVEMENT
-    possibleDestinations = Movable.possible_landing_squares(self.class, self)
-    for destination in possibleDestinations
-      route = Movable.route_finder(self, destination)
-      obstructed = false
-      for square in route
-        if board[square[0]][square[1]] != "X"
-          obstructed = true
-        end
-      end
-      if obstructed == false
-        @moves << destination
-      end
-    end
-    targets = Movable.attack_move_finder(self, board)
-    @moves = @moves + targets
-  end
 end
 
 class Bishop < Board
-  attr_reader :team, :symbol, :value, :type
+  attr_reader :team, :symbol, :value
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, position, type)
+  def initialize(team, symbol, position)
     @team = team
-    @type = type
     @symbol = symbol
     @status = "Active"
     @moved = false
@@ -750,35 +720,15 @@ class Bishop < Board
 
   PIECE_MOVEMENT = [[1,1], [1,-1], [-1,1], [-1,-1]]
 
-  def move_finder(position=@position)
-    @moves = []
-    board
-    piecemoves = PIECE_MOVEMENT
-    possibleDestinations = Movable.possible_landing_squares(self.class, self)
-    for destination in possibleDestinations
-      route = Movable.route_finder(self, destination)
-      obstructed = false
-      for square in route
-        if board[square[0]][square[1]] != "X"
-          obstructed = true
-        end
-      end
-      if obstructed == false
-        @moves << destination
-      end
-    end
-    targets = Movable.attack_move_finder(self, board)
-    @moves = @moves + targets
-  end
+
 end
 
 class Knight < Board
-  attr_reader :team, :symbol, :value, :type
+  attr_reader :team, :symbol, :value
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, position, type)
+  def initialize(team, symbol, position)
       @team = team
-      @type = type
       @symbol = symbol
       @status = "Active"
       @moved = false
@@ -793,32 +743,15 @@ class Knight < Board
 
   PIECE_MOVEMENT = [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [-1,2], [1,-2], [-1,-2]]
 
-  def move_finder(position=@position)
-    @moves = []
-    board
-    moves = PIECE_MOVEMENT
-    possibleDestinations = Movable.possible_landing_squares(self.class, self)
-    for destination in possibleDestinations
-      obstructed = false
-      if board[destination[0]][destination[1]] != "X"
-          obstructed = true
-      end
-      if obstructed == false
-        @moves << destination
-      end
-    end
-    targets = Movable.attack_move_finder(self, board)
-    @moves = @moves + targets
-  end
+
 end
 
 class BlackPawn < Board
-  attr_reader :team, :symbol, :value, :type
+  attr_reader :team, :symbol, :value
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, position, type)
+  def initialize(team, symbol, position)
       @team = team
-      @type = type
       @symbol = symbol
       @status = "Active"
       @moves = []
@@ -835,49 +768,15 @@ class BlackPawn < Board
 
   ATTACK_MOVEMENTS = [[1, 1], [1, -1]]
 
-  def attack_move_finder(position=@position)
-    targets = []
-    board
-    moves = ATTACK_MOVEMENTS
-    attackableSquares = Movable.attackable_squares(moves, self)
-    for square in attackableSquares
-      if Movable.opponent?(self, square, board)
-        targets << square
-      end
-    end
-    targets
-  end
 
-  def move_finder(position=@position)
-    @moves = []
-    # binding.pry
-    board
-    pieceMoves = PIECE_MOVEMENT
-    possibleDestinations = Movable.possible_landing_squares(self.class, self)
-    for destination in possibleDestinations
-      route = Movable.route_finder(self, destination)
-      obstructed = false
-      for square in route
-        if board[square[0]][square[1]] != "X"
-          obstructed = true
-        end
-      end
-      if obstructed == false
-        @moves << destination
-      end
-    end
-    targets = attack_move_finder()
-    @moves = @moves + targets
-  end
 end
 
 class WhitePawn < Board
-  attr_reader :team, :symbol, :value, :type
+  attr_reader :team, :symbol, :value
   attr_accessor :status, :moves, :moved, :position
 
-  def initialize(team, symbol, position, type)
+  def initialize(team, symbol, position)
       @team = team
-      @type = type
       @symbol = symbol
       @status = "Active"
       @moves = []
@@ -894,39 +793,6 @@ class WhitePawn < Board
 
   ATTACK_MOVEMENTS = [[-1, 1], [-1,-1]]
 
-  def attack_move_finder(position=@position)
-    targets = []
-    board
-    moves = ATTACK_MOVEMENTS
-    attackableSquares = Movable.attackable_squares(moves, self)
-    for square in attackableSquares
-      if Movable.opponent?(self, square, board)
-        targets << square
-      end
-    end
-    targets
-  end
-
-  def move_finder(position=@position)
-    @moves = []
-    board
-    pieceMoves = PIECE_MOVEMENT
-    possibleDestinations = Movable.possible_landing_squares(self.class, self)
-    for destination in possibleDestinations
-      route = Movable.route_finder(self, destination)
-      obstructed = false
-      for square in route
-        if board[square[0]][square[1]] != "X"
-          obstructed = true
-        end
-      end
-      if obstructed == false
-        @moves << destination
-      end
-    end
-    targets = attack_move_finder()
-    @moves = @moves + targets
-  end
 end
 
 
@@ -934,4 +800,3 @@ end
 
 newgame = Game.new
 p newgame.play_game
-p newgame.possible_landing_squares(whiteKing)
